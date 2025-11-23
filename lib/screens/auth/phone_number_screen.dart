@@ -162,7 +162,7 @@ class _PhoneNumberScreenState extends State<PhoneNumberScreen> {
                     const SizedBox(height: 40),
                     ShadCard(
                       child: Padding(
-                        padding: const EdgeInsets.all(24.0),
+                        padding: const EdgeInsets.all(3.0),
                         child: Column(
                           children: [
                             Row(
@@ -181,7 +181,7 @@ class _PhoneNumberScreenState extends State<PhoneNumberScreen> {
                                         children: [
                                           Text(
                                             _selectedCountryCode?.toString() ?? '+229',
-                                            style: const TextStyle(fontSize: 18),
+                                            style: const TextStyle(fontSize: 12),
                                           ),
                                           const Icon(Icons.arrow_drop_down),
                                         ],

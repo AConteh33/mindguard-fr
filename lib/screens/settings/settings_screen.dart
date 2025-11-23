@@ -2,10 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:shadcn_ui/shadcn_ui.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../providers/theme_provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/settings_provider.dart';
 import '../../widgets/visual/animated_background_visual.dart';
+import 'package:intl/intl.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -40,64 +42,64 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   label: const Text('Mode nuit'),
                 ),
               ),
-              // const SizedBox(height: 16),
-              // _buildSettingItem(
-              //   child: Row(
-              //     children: [
-              //       Expanded(
-              //         child: Container(
-              //           padding: const EdgeInsets.symmetric(horizontal: 8),
-              //           decoration: BoxDecoration(
-              //             border: Border.all(
-              //               color: Theme.of(context).colorScheme.outline,
-              //             ),
-              //             borderRadius: BorderRadius.circular(8),
-              //           ),
-              //           child: DropdownButton<String>(
-              //             value: themeProvider.currentTheme,
-              //             isExpanded: true,
-              //             underline: const SizedBox(),
-              //             onChanged: (value) {
-              //               if (value != null) {
-              //                 themeProvider.setTheme(value);
-              //               }
-              //             },
-              //             items: [
-              //               DropdownMenuItem(
-              //                 value: 'default',
-              //                 child: const Text('Thème par défaut'),
-              //               ),
-              //               DropdownMenuItem(
-              //                 value: 'blue',
-              //                 child: const Text('Bleu'),
-              //               ),
-              //               DropdownMenuItem(
-              //                 value: 'green',
-              //                 child: const Text('Vert'),
-              //               ),
-              //               DropdownMenuItem(
-              //                 value: 'orange',
-              //                 child: const Text('Orange'),
-              //               ),
-              //               DropdownMenuItem(
-              //                 value: 'red',
-              //                 child: const Text('Rouge'),
-              //               ),
-              //               DropdownMenuItem(
-              //                 value: 'violet',
-              //                 child: const Text('Violet'),
-              //               ),
-              //               DropdownMenuItem(
-              //                 value: 'zinc',
-              //                 child: const Text('Zinc'),
-              //               ),
-              //             ],
-              //           ),
-              //         ),
-              //       ),
-              //     ],
-              //   ),
-              // ),
+              const SizedBox(height: 16),
+              _buildSettingItem(
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8),
+                        decoration: BoxDecoration(
+                          border: Border.all(
+                            color: Theme.of(context).colorScheme.outline,
+                          ),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: DropdownButton<String>(
+                          value: themeProvider.currentTheme,
+                          isExpanded: true,
+                          underline: const SizedBox(),
+                          onChanged: (value) {
+                            if (value != null) {
+                              themeProvider.setTheme(value);
+                            }
+                          },
+                          items: [
+                            DropdownMenuItem(
+                              value: 'default',
+                              child: const Text('Thème par défaut'),
+                            ),
+                            DropdownMenuItem(
+                              value: 'blue',
+                              child: const Text('Bleu'),
+                            ),
+                            DropdownMenuItem(
+                              value: 'green',
+                              child: const Text('Vert'),
+                            ),
+                            DropdownMenuItem(
+                              value: 'orange',
+                              child: const Text('Orange'),
+                            ),
+                            DropdownMenuItem(
+                              value: 'red',
+                              child: const Text('Rouge'),
+                            ),
+                            DropdownMenuItem(
+                              value: 'violet',
+                              child: const Text('Violet'),
+                            ),
+                            DropdownMenuItem(
+                              value: 'zinc',
+                              child: const Text('Zinc'),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
               const SizedBox(height: 16),
               // Theme preview
               _buildSettingItem(
@@ -202,7 +204,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               _buildInfoRow('Nom', authProvider.userModel?.name ?? 'N/A'),
               _buildInfoRow('E-mail', authProvider.userModel?.email ?? 'N/A'),
               _buildInfoRow('Rôle', _getRoleLabel(authProvider.userModel?.role ?? '')),
-              _buildInfoRow('Date d\'inscription', '15 Juin 2023'),
+              _buildInfoRow('Date d\'inscription', _formatDate(authProvider.userModel?.createdAt)),
               const SizedBox(height: 24),
               
               // Account actions section
@@ -225,6 +227,31 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         'Se déconnecter',
                         style: TextStyle(
                           color: Theme.of(context).colorScheme.error,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              _buildSettingItem(
+                child: ShadButton.outline(
+                  onPressed: () {
+                    _showResetSettingsDialog(context);
+                  },
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.refresh,
+                        size: 18,
+                        color: Theme.of(context).colorScheme.outline,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Réinitialiser les paramètres',
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.outline,
                         ),
                       ),
                     ],
@@ -306,6 +333,27 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
   }
 
+  String _formatDate(dynamic timestamp) {
+    if (timestamp == null) return 'N/A';
+    
+    try {
+      DateTime date;
+      if (timestamp is Timestamp) {
+        date = timestamp.toDate();
+      } else if (timestamp is String) {
+        date = DateTime.parse(timestamp);
+      } else if (timestamp is int) {
+        date = DateTime.fromMillisecondsSinceEpoch(timestamp);
+      } else {
+        return 'N/A';
+      }
+      
+      return DateFormat('dd MMMM yyyy', 'fr_FR').format(date);
+    } catch (e) {
+      return 'N/A';
+    }
+  }
+
   void _showSignOutDialog(BuildContext context) {
     showDialog(
       context: context,
@@ -330,6 +378,43 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 context.go('/');
               },
               child: const Text('Se déconnecter'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _showResetSettingsDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Réinitialiser les paramètres'),
+          content: const Text(
+            'Êtes-vous sûr de vouloir réinitialiser tous les paramètres à leurs valeurs par défaut? Cette action ne peut pas être annulée.',
+          ),
+          actions: [
+            ShadButton.outline(
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+              child: const Text('Annuler'),
+            ),
+            ShadButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+                final settingsProvider = Provider.of<SettingsProvider>(context, listen: false);
+                settingsProvider.resetToDefaults();
+                
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Paramètres réinitialisés avec succès'),
+                    backgroundColor: Colors.green,
+                  ),
+                );
+              },
+              child: const Text('Réinitialiser'),
             ),
           ],
         );

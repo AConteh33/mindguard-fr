@@ -94,6 +94,14 @@ class MyApp extends StatelessWidget {
           return ShadApp.router(
             routerConfig: appRouter,
             title: 'MindGuard FR',
+            builder: (context, child) {
+              return MediaQuery(
+                data: MediaQuery.of(context).copyWith(
+                  textScaleFactor: 0.8, // Reduced text size (10 instead of default ~12-14)
+                ),
+                child: child!,
+              );
+            },
             theme: ShadThemeData(
               brightness: Brightness.light,
               colorScheme: themeProvider.getRoleColorScheme(false),

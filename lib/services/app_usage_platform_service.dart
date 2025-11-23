@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/services.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/foundation.dart' show TargetPlatform, defaultTargetPlatform;
 
 class AppUsagePlatformService {
   static const platform = MethodChannel('com.example.mindguard_fr/app_usage');
@@ -130,7 +131,7 @@ class AppUsagePlatformService {
   static Future<bool> canMonitorUsage() async {
     try {
       // Check if we're on Android
-      if (!defaultTargetPlatform.isAndroid) {
+      if (defaultTargetPlatform != TargetPlatform.android) {
         return false;
       }
       
