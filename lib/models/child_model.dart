@@ -9,6 +9,10 @@ class ChildModel {
   final bool isActive;
   final DateTime? createdAt;
 
+  // Getters for compatibility
+  String get id => childId;
+  String get name => childName;
+
   ChildModel({
     required this.childId,
     required this.childName,

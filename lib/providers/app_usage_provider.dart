@@ -1,42 +1,76 @@
 import 'package:flutter/foundation.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import '../services/app_usage_platform_service.dart';
 
 class AppUsageProvider with ChangeNotifier {
   List<Map<String, dynamic>> _appUsageData = [];
   bool _isLoading = false;
+  bool _hasNativeTracking = false;
+  String? _lastError;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
   List<Map<String, dynamic>> get appUsageData => _appUsageData;
   bool get isLoading => _isLoading;
+  bool get hasNativeTracking => _hasNativeTracking;
+  String? get lastError => _lastError;
 
   Future<void> loadAppUsageData(String userId, {int daysBack = 7}) async {
     _isLoading = true;
+    _lastError = null;
     notifyListeners();
 
     try {
-      final now = DateTime.now();
-      final startDate = now.subtract(Duration(days: daysBack));
+      // Try to get native data first
+      final canMonitor = await AppUsagePlatformService.canMonitorUsage();
+      _hasNativeTracking = canMonitor;
 
-      QuerySnapshot snapshot = await _firestore
-          .collection('app_usage')
-          .where('userId', isEqualTo: userId)
-          .where('timestamp', isGreaterThanOrEqualTo: startDate.millisecondsSinceEpoch)
-          .orderBy('timestamp', descending: true)
-          .get();
-
-      _appUsageData = snapshot.docs
-          .map((doc) => {
-            'id': doc.id,
-            ...doc.data() as Map<String, dynamic>,
-          })
-          .toList();
+      if (canMonitor) {
+        // Get data from native platform
+        final nativeUsage = await AppUsagePlatformService.getAppUsage(daysBack: daysBack);
+        
+        // Convert to expected format and save to Firestore
+        for (final app in nativeUsage) {
+          await addAppUsageEntry(
+            userId,
+            app['packageName'] as String? ?? '',
+            app['appName'] as String? ?? '',
+            app['usageTimeSeconds'] as int? ?? 0,
+          );
+        }
+        
+        // Load from Firestore to get consistent data
+        await _loadFromFirestore(userId, daysBack);
+      } else {
+        // Fallback to Firestore only
+        await _loadFromFirestore(userId, daysBack);
+      }
     } catch (e) {
+      _lastError = e.toString();
       if (kDebugMode) print('Error loading app usage data: $e');
       _appUsageData = [];
     } finally {
       _isLoading = false;
       notifyListeners();
     }
+  }
+
+  Future<void> _loadFromFirestore(String userId, int daysBack) async {
+    final now = DateTime.now();
+    final startDate = now.subtract(Duration(days: daysBack));
+
+    QuerySnapshot snapshot = await _firestore
+        .collection('app_usage')
+        .where('userId', isEqualTo: userId)
+        .where('timestamp', isGreaterThanOrEqualTo: startDate.millisecondsSinceEpoch)
+        .orderBy('timestamp', descending: true)
+        .get();
+
+    _appUsageData = snapshot.docs
+        .map((doc) => {
+          'id': doc.id,
+          ...doc.data() as Map<String, dynamic>,
+        })
+        .toList();
   }
 
   Future<void> addAppUsageEntry(String userId, String packageName, String appName, int usageTimeSeconds) async {
@@ -110,6 +144,7 @@ class AppUsageProvider with ChangeNotifier {
         'totalUsageTime': 0,
         'averageDailyUsage': 0,
         'mostUsedApp': '',
+        'hasNativeTracking': _hasNativeTracking,
       };
     }
 
@@ -135,6 +170,110 @@ class AppUsageProvider with ChangeNotifier {
       'averageDailyUsage': totalTime ~/ appTotals.keys.length, // Simplified calculation
       'mostUsedApp': mostUsedAppEntry.key,
       'mostUsedAppTime': mostUsedAppEntry.value,
+      'hasNativeTracking': _hasNativeTracking,
     };
+  }
+
+  // Check and request usage stats permission
+  Future<bool> checkAndRequestUsageStatsPermission() async {
+    try {
+      final hasPermission = await AppUsagePlatformService.hasUsageStatsPermission();
+      
+      if (!hasPermission) {
+        await AppUsagePlatformService.requestUsageStatsPermission();
+        
+        // Wait a bit and check again
+        await Future.delayed(const Duration(seconds: 3));
+        final nowHasPermission = await AppUsagePlatformService.hasUsageStatsPermission();
+        return nowHasPermission;
+      }
+      
+      return true;
+    } catch (e) {
+      _lastError = e.toString();
+      notifyListeners();
+      return false;
+    }
+  }
+
+  // Get real-time usage summary
+  Future<Map<String, dynamic>> getRealtimeUsageSummary() async {
+    try {
+      final summary = await AppUsagePlatformService.getUsageSummary();
+      _hasNativeTracking = summary['canMonitor'] == true;
+      notifyListeners();
+      return summary;
+    } catch (e) {
+      _lastError = e.toString();
+      notifyListeners();
+      return {
+        'hasNativeTracking': false,
+        'error': e.toString(),
+        ...getUsageStats(),
+      };
+    }
+  }
+
+  // Get top apps from native platform
+  Future<List<Map<String, dynamic>>> getTopApps({int limit = 10}) async {
+    try {
+      if (_hasNativeTracking) {
+        return await AppUsagePlatformService.getTopApps(limit: limit);
+      } else {
+        // Fallback to Firestore data
+        return getTopAppsByUsage(limit: limit);
+      }
+    } catch (e) {
+      _lastError = e.toString();
+      notifyListeners();
+      return getTopAppsByUsage(limit: limit);
+    }
+  }
+
+  // Refresh data with native integration
+  Future<void> refreshWithNativeData(String userId, {int daysBack = 7}) async {
+    _isLoading = true;
+    notifyListeners();
+
+    try {
+      // Check if native tracking is available
+      final canMonitor = await AppUsagePlatformService.canMonitorUsage();
+      _hasNativeTracking = canMonitor;
+
+      if (canMonitor) {
+        // Get fresh data from native platform
+        final nativeUsage = await AppUsagePlatformService.getAppUsage(daysBack: daysBack);
+        
+        // Clear existing data and add fresh data
+        _appUsageData.clear();
+        
+        for (final app in nativeUsage) {
+          await addAppUsageEntry(
+            userId,
+            app['packageName'] as String? ?? '',
+            app['appName'] as String? ?? '',
+            app['usageTimeSeconds'] as int? ?? 0,
+          );
+        }
+        
+        // Reload from Firestore to get consistent data
+        await _loadFromFirestore(userId, daysBack);
+      } else {
+        // Fallback to existing method
+        await loadAppUsageData(userId, daysBack: daysBack);
+      }
+    } catch (e) {
+      _lastError = e.toString();
+      if (kDebugMode) print('Error refreshing with native data: $e');
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  // Clear error state
+  void clearError() {
+    _lastError = null;
+    notifyListeners();
   }
 }

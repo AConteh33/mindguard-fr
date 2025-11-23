@@ -13,6 +13,10 @@ class ChildrenProvider with ChangeNotifier {
   bool get isLoading => _isLoading;
   UserModel? get parent => _parent;
 
+  Future<void> loadChildren(String parentId) async {
+    await loadChildrenForParent(parentId);
+  }
+
   Future<void> loadChildrenForParent(String parentId) async {
     _isLoading = true;
     notifyListeners();

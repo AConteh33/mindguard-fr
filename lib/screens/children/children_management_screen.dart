@@ -6,6 +6,7 @@ import '../../providers/auth_provider.dart';
 import '../../providers/children_provider.dart';
 import '../../models/child_model.dart';
 import '../../widgets/visual/animated_background_visual.dart';
+import 'add_child_screen.dart';
 
 class ChildrenManagementScreen extends StatefulWidget {
   const ChildrenManagementScreen({super.key});
@@ -15,8 +16,6 @@ class ChildrenManagementScreen extends StatefulWidget {
 }
 
 class _ChildrenManagementScreenState extends State<ChildrenManagementScreen> {
-  String _invitationCode = '';
-
   @override
   void initState() {
     super.initState();
@@ -57,49 +56,34 @@ class _ChildrenManagementScreenState extends State<ChildrenManagementScreen> {
                       ],
                     ),
                     const SizedBox(height: 16),
-                    ShadInput(
-                      placeholder: const Text('Entrez le code d\'invitation de votre enfant'),
-                      onChanged: (value) {
-                        setState(() {
-                          _invitationCode = value;
-                        });
-                      },
+                    SizedBox(
+                      width: double.infinity,
+                      child: ShadButton(
+                        onPressed: () {
+                          // Navigate to the dedicated add child screen
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (context) => const AddChildScreen(),
+                            ),
+                          );
+                        },
+                        child: const Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.add_circle_outline),
+                            SizedBox(width: 8),
+                            Text('Ajouter un enfant'),
+                          ],
+                        ),
+                      ),
                     ),
-                    const SizedBox(height: 16),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: ShadButton(
-                            onPressed: _invitationCode.isNotEmpty
-                              ? () {
-                                  // In a real app, this would handle linking a child using the code
-                                  // For now just show a snackbar
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(
-                                      content: Text('Code soumis - en attente de confirmation de l\'enfant'),
-                                    ),
-                                  );
-                                }
-                              : null,
-                            child: const Text('Lier l\'enfant'),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        ShadButton(
-                          onPressed: () {
-                            // Navigate to QR scanner
-                            context.push('/qr-scanner');
-                          },
-                          child: const Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(Icons.qr_code_scanner),
-                              SizedBox(width: 8),
-                              Text('Scanner'),
-                            ],
-                          ),
-                        ),
-                      ],
+                    const SizedBox(height: 12),
+                    Text(
+                      'Choisissez entre scanner un QR code ou utiliser un code d\'invitation',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Theme.of(context).colorScheme.outline,
+                      ),
+                      textAlign: TextAlign.center,
                     ),
                   ],
                 ),

@@ -12,8 +12,14 @@ import 'package:mindguard_fr/providers/assessment_provider.dart';
 import 'package:mindguard_fr/providers/client_provider.dart';
 import 'package:mindguard_fr/providers/appointments_provider.dart';
 import 'package:mindguard_fr/providers/messages_provider.dart';
+import 'package:mindguard_fr/providers/parental_controls_provider.dart';
 import 'package:mindguard_fr/router/app_router.dart';
 import 'package:mindguard_fr/services/focus_notification_service.dart';
+import 'package:mindguard_fr/services/parental_notification_service.dart';
+import 'package:mindguard_fr/services/realtime_parental_service.dart';
+import 'package:mindguard_fr/services/app_blocking_service.dart';
+import 'package:mindguard_fr/services/screen_time_monitoring_service.dart';
+import 'package:mindguard_fr/services/app_usage_platform_service.dart';
 import 'package:provider/provider.dart';
 import 'package:shadcn_ui/shadcn_ui.dart';
 import 'package:go_router/go_router.dart';
@@ -27,6 +33,12 @@ void main() async {
 
   // Initialize focus notifications
   await FocusNotificationService.initialize();
+  
+  // Initialize parental controls services
+  await ParentalNotificationService().initialize();
+
+  // Check and initialize app usage tracking
+  await _initializeAppUsageTracking();
 
   runApp(
     MultiProvider(
@@ -43,6 +55,7 @@ void main() async {
         ChangeNotifierProvider(create: (context) => ClientProvider()),
         ChangeNotifierProvider(create: (context) => AppointmentsProvider()),
         ChangeNotifierProvider(create: (context) => MessagesProvider()),
+        ChangeNotifierProvider(create: (context) => ParentalControlsProvider()),
       ],
       child: const MyApp(),
     ),
@@ -97,5 +110,29 @@ class MyApp extends StatelessWidget {
         },
       ),
     );
+  }
+}
+
+// Initialize app usage tracking
+Future<void> _initializeAppUsageTracking() async {
+  try {
+    // Check if usage stats permission is available
+    final hasPermission = await AppUsagePlatformService.hasUsageStatsPermission();
+    
+    if (!hasPermission) {
+      print('App usage tracking permission not granted. Please enable Usage Stats permission in Settings.');
+      return;
+    }
+    
+    // Test if we can get usage data
+    final canMonitor = await AppUsagePlatformService.canMonitorUsage();
+    
+    if (canMonitor) {
+      print('App usage tracking initialized successfully');
+    } else {
+      print('App usage tracking initialization failed - permission or compatibility issue');
+    }
+  } catch (e) {
+    print('Error initializing app usage tracking: $e');
   }
 }

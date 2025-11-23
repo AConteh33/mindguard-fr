@@ -30,7 +30,7 @@ class BottomNavBar extends StatelessWidget {
       case 'parent':
         if (location.startsWith('/dashboard')) return 0;
         if (location.startsWith('/children')) return 1;
-        if (location.startsWith('/reports')) return 2;
+        if (location.startsWith('/parental-controls')) return 2;
         if (location.startsWith('/profile')) return 3;
         if (location.startsWith('/settings')) return 4;
         break;
@@ -60,7 +60,7 @@ class BottomNavBar extends StatelessWidget {
         switch (index) {
           case 0: return '/dashboard';
           case 1: return '/children';
-          case 2: return '/reports';
+          case 2: return '/parental-controls';
           case 3: return '/profile';
           case 4: return '/settings';
           default: return '/dashboard';
@@ -100,8 +100,8 @@ class BottomNavBar extends StatelessWidget {
             label: 'Enfants',
           ),
           NavigationDestination(
-            icon: Icon(Icons.bar_chart),
-            label: 'Rapports',
+            icon: Icon(Icons.family_restroom),
+            label: 'Contrôles',
           ),
           NavigationDestination(
             icon: Icon(Icons.person),

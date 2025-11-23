@@ -20,6 +20,7 @@ import '../models/child_model.dart';
 import '../screens/qr_scanner_screen.dart';
 import '../screens/qr_code_display_screen.dart';
 import '../screens/connection_requests_screen.dart';
+import '../screens/parental_controls/parental_controls_screen.dart';
 
 // Define app routes using GoRouter
 final GoRouter appRouter = GoRouter(
@@ -119,6 +120,13 @@ final GoRouter appRouter = GoRouter(
         final index = userRole == 'parent' ? 4 : 4;
         return MainTabScreen(initialIndex: index);
       },
+    ),
+    
+    // Parental Controls
+    GoRoute(
+      path: '/parental-controls',
+      name: 'parental_controls',
+      builder: (context, state) => const ParentalControlsScreen(),
     ),
     
     // Add child

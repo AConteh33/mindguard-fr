@@ -7,6 +7,7 @@ import '../../providers/screen_time_provider.dart';
 import '../../providers/mood_provider.dart';
 import '../../providers/app_usage_provider.dart';
 import '../../providers/children_provider.dart';
+import '../../providers/focus_session_provider.dart';
 import '../../widgets/visual/glass_button.dart';
 import '../../animations/custom_animations.dart';
 import '../../widgets/visual/enhanced_stat_card.dart';
@@ -54,6 +55,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       final moodProvider = Provider.of<MoodProvider>(context, listen: false);
       final appUsageProvider = Provider.of<AppUsageProvider>(context, listen: false);
       final childrenProvider = Provider.of<ChildrenProvider>(context, listen: false);
+      final focusSessionProvider = Provider.of<FocusSessionProvider>(context, listen: false);
 
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
       if (authProvider.userModel != null) {
@@ -63,6 +65,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         screenTimeProvider.loadScreenTimeData(userId);
         moodProvider.loadMoodEntries(userId);
         appUsageProvider.loadAppUsageData(userId, daysBack: 1); // Load today's data only
+        focusSessionProvider.loadFocusSessions(userId);
         
         // Load linked people data based on user role
         if (userRole == 'parent') {
@@ -81,6 +84,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final moodProvider = Provider.of<MoodProvider>(context);
     final appUsageProvider = Provider.of<AppUsageProvider>(context);
     final childrenProvider = Provider.of<ChildrenProvider>(context);
+    final focusSessionProvider = Provider.of<FocusSessionProvider>(context);
 
     // Get actual screen time data
     final todayScreenTime = screenTimeProvider.getTodayScreenTime();
@@ -293,69 +297,112 @@ class _DashboardScreenState extends State<DashboardScreen> {
                               ],
                             ),
                             const SizedBox(height: 16),
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: Container(
-                                    padding: const EdgeInsets.all(16),
-                                    decoration: BoxDecoration(
-                                      color: Theme.of(context).colorScheme.primaryContainer,
-                                      borderRadius: BorderRadius.circular(12),
-                                    ),
-                                    child: Column(
-                                      children: [
-                                        Icon(
-                                          Icons.timer,
-                                          size: 32,
-                                          color: Theme.of(context).colorScheme.primary,
-                                        ),
-                                        const SizedBox(height: 8),
-                                        Text(
-                                          '60%',
-                                          style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                                            color: Theme.of(context).colorScheme.primary,
+                            // Show loading state while focus sessions are loading
+                            if (focusSessionProvider.isLoading)
+                              const Center(
+                                child: CircularProgressIndicator(),
+                              )
+                            else
+                              // Get actual focus session statistics
+                              Builder(
+                                builder: (context) {
+                                  final focusStats = focusSessionProvider.getFocusStats();
+                                  final completionRate = ((focusStats['completionRate'] as double) * 100).round();
+                                  final totalSessions = focusStats['totalSessions'] as int;
+                                  
+                                  // Show empty state if no sessions
+                                  if (totalSessions == 0) {
+                                    return Center(
+                                      child: Column(
+                                        children: [
+                                          Icon(
+                                            Icons.timer_off,
+                                            size: 48,
+                                            color: Theme.of(context).colorScheme.outline,
+                                          ),
+                                          const SizedBox(height: 16),
+                                          Text(
+                                            'Aucune session de concentration',
+                                            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                              color: Theme.of(context).colorScheme.outline,
+                                            ),
+                                          ),
+                                          Text(
+                                            'Commencez votre première session pour voir les statistiques',
+                                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                              color: Theme.of(context).colorScheme.outline,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    );
+                                  }
+                                  
+                                  return Row(
+                                    children: [
+                                      Expanded(
+                                        child: Container(
+                                          padding: const EdgeInsets.all(16),
+                                          decoration: BoxDecoration(
+                                            color: Theme.of(context).colorScheme.primaryContainer,
+                                            borderRadius: BorderRadius.circular(12),
+                                          ),
+                                          child: Column(
+                                            children: [
+                                              Icon(
+                                                Icons.timer,
+                                                size: 32,
+                                                color: Theme.of(context).colorScheme.primary,
+                                              ),
+                                              const SizedBox(height: 8),
+                                              Text(
+                                                totalSessions.toString(),
+                                                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                                                  color: Theme.of(context).colorScheme.primary,
+                                                ),
+                                              ),
+                                              Text(
+                                                'Sessions totales',
+                                                style: Theme.of(context).textTheme.bodySmall,
+                                              ),
+                                            ],
                                           ),
                                         ),
-                                        Text(
-                                          'Progression',
-                                          style: Theme.of(context).textTheme.bodySmall,
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(width: 16),
-                                Expanded(
-                                  child: Container(
-                                    padding: const EdgeInsets.all(16),
-                                    decoration: BoxDecoration(
-                                      color: Theme.of(context).colorScheme.secondaryContainer,
-                                      borderRadius: BorderRadius.circular(12),
-                                    ),
-                                    child: Column(
-                                      children: [
-                                        Icon(
-                                          Icons.emoji_events,
-                                          size: 32,
-                                          color: Theme.of(context).colorScheme.secondary,
-                                        ),
-                                        const SizedBox(height: 8),
-                                        Text(
-                                          '80%',
-                                          style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                                            color: Theme.of(context).colorScheme.secondary,
+                                      ),
+                                      const SizedBox(width: 16),
+                                      Expanded(
+                                        child: Container(
+                                          padding: const EdgeInsets.all(16),
+                                          decoration: BoxDecoration(
+                                            color: Theme.of(context).colorScheme.secondaryContainer,
+                                            borderRadius: BorderRadius.circular(12),
+                                          ),
+                                          child: Column(
+                                            children: [
+                                              Icon(
+                                                Icons.emoji_events,
+                                                size: 32,
+                                                color: Theme.of(context).colorScheme.secondary,
+                                              ),
+                                              const SizedBox(height: 8),
+                                              Text(
+                                                '$completionRate%',
+                                                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                                                  color: Theme.of(context).colorScheme.secondary,
+                                                ),
+                                              ),
+                                              Text(
+                                                'Taux de réussite',
+                                                style: Theme.of(context).textTheme.bodySmall,
+                                              ),
+                                            ],
                                           ),
                                         ),
-                                        Text(
-                                          'Objectif atteint',
-                                          style: Theme.of(context).textTheme.bodySmall,
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
+                                      ),
+                                    ],
+                                  );
+                                },
+                              ),
                           ],
                         ),
                       ),
@@ -675,6 +722,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final screenTimeProvider = Provider.of<ScreenTimeProvider>(context, listen: false);
     final moodProvider = Provider.of<MoodProvider>(context, listen: false);
     final appUsageProvider = Provider.of<AppUsageProvider>(context, listen: false);
+    final focusSessionProvider = Provider.of<FocusSessionProvider>(context, listen: false);
     
     // Calculate days back based on time range
     int daysBack = 1; // Default to today
@@ -694,6 +742,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     screenTimeProvider.loadScreenTimeData(userId);
     moodProvider.loadMoodEntries(userId);
     appUsageProvider.loadAppUsageData(userId, daysBack: daysBack);
+    focusSessionProvider.loadFocusSessions(userId);
   }
 
   Widget _buildStatCard(
