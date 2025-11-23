@@ -1,0 +1,346 @@
+import 'package:flutter/material.dart';
+import 'package:shadcn_ui/shadcn_ui.dart';
+import 'package:provider/provider.dart';
+import 'package:go_router/go_router.dart';
+import 'package:fl_chart/fl_chart.dart';
+import '../../providers/auth_provider.dart';
+import '../../widgets/bottom_nav_bar.dart';
+import '../../animations/custom_animations.dart';
+import '../../widgets/visual/custom_circular_progress_indicator.dart';
+import '../../widgets/visual/enhanced_stat_card.dart';
+import '../../widgets/visual/mood_visualization.dart';
+import '../../widgets/visual/custom_line_chart.dart';
+
+class DashboardScreen extends StatelessWidget {
+  const DashboardScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final authProvider = Provider.of<AuthProvider>(context);
+    
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Tableau de bord'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.notifications_outlined),
+            onPressed: () {
+              // Handle notifications
+            },
+          ),
+          const SizedBox(width: 8),
+          Padding(
+            padding: const EdgeInsets.only(right: 16.0),
+            child: CircleAvatar(
+              radius: 20,
+              child: const Icon(Icons.person),
+            ),
+          ),
+        ],
+      ),
+      body: SingleChildScrollView(
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+            CustomAnimations.slideInFromBottom(
+              child: Text(
+                'Bonjour, ${authProvider.userModel?.name ?? 'Utilisateur'}!',
+                style: Theme.of(context).textTheme.headlineMedium,
+              ),
+            ),
+            const SizedBox(height: 8),
+            CustomAnimations.slideInFromBottom(
+              offset: 30,
+              duration: const Duration(milliseconds: 600),
+              child: Text(
+                'Voici votre résumé',
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  color: Theme.of(context).colorScheme.outline,
+                ),
+              ),
+            ),
+            const SizedBox(height: 24),
+            // Stats Cards
+            CustomAnimations.staggeredList(
+              children: [
+                SizedBox(
+                  height: 140,
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: _buildStatCard(
+                          context,
+                          '4h 23m',
+                          'Écran aujourd\'hui',
+                          Icons.devices_other,
+                          Theme.of(context).colorScheme.primary,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: _buildStatCard(
+                          context,
+                          '78%',
+                          'Temps productif',
+                          Icons.check_circle,
+                          Theme.of(context).colorScheme.primary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 12),
+                SizedBox(
+                  height: 140,
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: _buildStatCard(
+                          context,
+                          '3',
+                          'Objectifs atteints',
+                          Icons.flag,
+                          Theme.of(context).colorScheme.primary,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: _buildStatCard(
+                          context,
+                          '2',
+                          'Conseils vus',
+                          Icons.lightbulb,
+                          Theme.of(context).colorScheme.primary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 24),
+            CustomAnimations.slideInFromBottom(
+              offset: 30,
+              duration: const Duration(milliseconds: 800),
+              child: Text(
+                'Progression hebdomadaire',
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
+            ),
+            const SizedBox(height: 12),
+            CustomAnimations.fadeIn(
+              duration: const Duration(milliseconds: 1000),
+              child: CustomLineChart(
+                data: const [
+                  FlSpot(0, 3),
+                  FlSpot(1, 4),
+                  FlSpot(2, 3.5),
+                  FlSpot(3, 5),
+                  FlSpot(4, 4.5),
+                  FlSpot(5, 6),
+                  FlSpot(6, 4),
+                ],
+                title: 'Temps d\'écran (heures)',
+                xAxisLabels: ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'],
+                maxY: 8,
+              ),
+            ),
+            const SizedBox(height: 24),
+            CustomAnimations.slideInFromBottom(
+              offset: 30,
+              duration: const Duration(milliseconds: 700),
+              child: Text(
+                'Actions rapides',
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
+            ),
+            const SizedBox(height: 12),
+            CustomAnimations.staggeredList(
+              delay: const Duration(milliseconds: 150),
+              children: [
+                Wrap(
+                  spacing: 12,
+                  runSpacing: 12,
+                  children: [
+                    ShadButton.outline(
+                      onPressed: () {
+                        context.go('/focus');
+                      },
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.do_not_disturb_on_outlined, size: 16),
+                          const SizedBox(width: 8),
+                          const Text('Mode Focus'),
+                        ],
+                      ),
+                    ),
+                    ShadButton.outline(
+                      onPressed: () {
+                        context.go('/mood');
+                      },
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.sentiment_satisfied_outlined, size: 16),
+                          const SizedBox(width: 8),
+                          const Text('Humeur'),
+                        ],
+                      ),
+                    ),
+                    ShadButton.outline(
+                      onPressed: () {
+                        context.go('/settings');
+                      },
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.star_outline, size: 16),
+                          const SizedBox(width: 8),
+                          const Text('Succès'),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+            const SizedBox(height: 24),
+            CustomAnimations.slideInFromBottom(
+              offset: 30,
+              duration: const Duration(milliseconds: 900),
+              child: Text(
+                'Humeur récente',
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
+            ),
+            const SizedBox(height: 12),
+            CustomAnimations.fadeIn(
+              duration: const Duration(milliseconds: 1100),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: ShadCard(
+                      child: Padding(
+                        padding: const EdgeInsets.all(16.0),
+                        child: Column(
+                          children: [
+                            Text(
+                              'Humeur moyenne',
+                              style: Theme.of(context).textTheme.titleMedium,
+                            ),
+                            const SizedBox(height: 16),
+                            const CustomCircularProgressIndicator(
+                              value: 0.75,
+                              label: 'Humeur',
+                              subtitle: 'Cette semaine',
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: ShadCard(
+                      child: Padding(
+                        padding: const EdgeInsets.all(16.0),
+                        child: Column(
+                          children: [
+                            Text(
+                              'Tendance',
+                              style: Theme.of(context).textTheme.titleMedium,
+                            ),
+                            const SizedBox(height: 16),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                              children: const [
+                                MoodVisualization(moodValue: 4, size: 40),
+                                Icon(Icons.trending_up, color: Colors.green),
+                                MoodVisualization(moodValue: 5, size: 40),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              '+20%',
+                              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                color: Colors.green,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 24),
+            CustomAnimations.slideInFromBottom(
+              offset: 30,
+              duration: const Duration(milliseconds: 1000),
+              child: Text(
+                'Recommandations',
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
+            ),
+            const SizedBox(height: 12),
+            CustomAnimations.fadeIn(
+              duration: const Duration(milliseconds: 1200),
+              child: ShadCard(
+                child: Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.lightbulb,
+                        color: Theme.of(context).colorScheme.primary,
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Prenez une pause',
+                              style: Theme.of(context).textTheme.titleMedium,
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              'Vous avez passé 2h de plus sur votre téléphone aujourd\'hui. Pensez à faire une pause.',
+                              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                color: Theme.of(context).colorScheme.outline,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+      bottomNavigationBar: const BottomNavBar(),
+    );
+  }
+
+  Widget _buildStatCard(
+    BuildContext context,
+    String value,
+    String label,
+    IconData icon,
+    Color color,
+  ) {
+    return EnhancedStatCard(
+      value: value,
+      label: label,
+      icon: icon,
+      color: color,
+    );
+  }
+}
