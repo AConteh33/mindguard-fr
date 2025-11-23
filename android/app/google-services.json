@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "404679292252",
+    "project_id": "mind-guard-fr-81a22",
+    "storage_bucket": "mind-guard-fr-81a22.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:404679292252:android:f2271c6ee2dd0fe7ed3d99",
+        "android_client_info": {
+          "package_name": "com.example.mindguard_fr"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAnPI5PsaxW5F26MhoUxco7Rkxw-j9ErEU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

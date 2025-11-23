@@ -131,8 +131,8 @@ class AppUsageService : Service() {
             
             // Clean up old data (remove apps not used in last hour)
             val oneHourAgo = currentTime - TimeUnit.HOURS.toMillis(1)
-            lastUsageData.entries.removeAll { (_, lastTime) -> 
-                val stat = usageStats.find { it.packageName == it.key }
+            lastUsageData.entries.removeAll { (packageName, lastTime) ->
+                val stat = usageStats.find { it.packageName == packageName }
                 stat?.lastTimeUsed ?: 0 < oneHourAgo
             }
             

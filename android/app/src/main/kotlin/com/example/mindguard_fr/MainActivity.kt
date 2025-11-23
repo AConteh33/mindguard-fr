@@ -16,6 +16,7 @@ import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 import org.json.JSONArray
 import org.json.JSONObject
+import java.util.*
 
 class MainActivity : FlutterActivity() {
     private val DNS_MONITORING_CHANNEL = "com.example.mindguard_fr/dns_monitoring"
