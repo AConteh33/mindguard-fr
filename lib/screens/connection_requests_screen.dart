@@ -16,6 +16,17 @@ class ConnectionRequestsScreen extends StatefulWidget {
 class _ConnectionRequestsScreenState extends State<ConnectionRequestsScreen> {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
+  Stream<QuerySnapshot> _getConnectionRequests() {
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    if (authProvider.userModel == null) return Stream.empty();
+    
+    // Use a single field query instead of composite index
+    return _firestore
+        .collection('connection_requests')
+        .where('childId', isEqualTo: authProvider.userModel!.uid)
+        .snapshots();
+  }
+
   @override
   Widget build(BuildContext context) {
     final authProvider = Provider.of<AuthProvider>(context);
@@ -33,12 +44,7 @@ class _ConnectionRequestsScreenState extends State<ConnectionRequestsScreen> {
         title: const Text('Demandes de connexion'),
       ),
       body: StreamBuilder<QuerySnapshot>(
-        stream: _firestore
-            .collection('connection_requests')
-            .where('childId', isEqualTo: authProvider.userModel!.uid)
-            .where('status', isEqualTo: 'pending')
-            .orderBy('requestedAt', descending: true)
-            .snapshots(),
+        stream: _getConnectionRequests(),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(
@@ -53,37 +59,20 @@ class _ConnectionRequestsScreenState extends State<ConnectionRequestsScreen> {
           }
 
           if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-            return Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    Icons.link_off,
-                    size: 64,
-                    color: Theme.of(context).colorScheme.outline,
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    'Aucune demande de connexion',
-                    style: Theme.of(context).textTheme.headlineSmall,
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Partagez votre QR code avec vos parents pour recevoir des demandes',
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: Theme.of(context).colorScheme.outline,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 24),
-                  ShadButton.outline(
-                    onPressed: () {
-                      Navigator.of(context).pushReplacementNamed('/qr-code');
-                    },
-                    child: const Text('Voir mon QR code'),
-                  ),
-                ],
-              ),
+            return const Center(
+              child: Text('Aucune demande de connexion trouvée'),
+            );
+          }
+
+          // Filter pending requests in the UI instead of query
+          final pendingRequests = snapshot.data!.docs.where((doc) {
+            final data = doc.data() as Map<String, dynamic>;
+            return data['status'] == 'pending';
+          }).toList();
+
+          if (pendingRequests.isEmpty) {
+            return const Center(
+              child: Text('Aucune demande de connexion en attente'),
             );
           }
 
@@ -91,9 +80,9 @@ class _ConnectionRequestsScreenState extends State<ConnectionRequestsScreen> {
 
           return ListView.builder(
             padding: const EdgeInsets.all(16.0),
-            itemCount: requests.length,
+            itemCount: pendingRequests.length,
             itemBuilder: (context, index) {
-              final request = requests[index];
+              final request = pendingRequests[index];
               final requestData = request.data() as Map<String, dynamic>;
               final parentId = requestData['parentId'] as String;
               final parentName = requestData['parentName'] as String;
@@ -220,10 +209,10 @@ class _ConnectionRequestsScreenState extends State<ConnectionRequestsScreen> {
 
       // Show success message
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Vous êtes maintenant lié avec $parentName!'),
-            backgroundColor: Theme.of(context).colorScheme.primary,
+        ShadToaster.of(context).show(
+          ShadToast(
+            title: const Text('Connexion établie'),
+            description: Text('Vous êtes maintenant lié avec $parentName!'),
           ),
         );
         
@@ -236,10 +225,10 @@ class _ConnectionRequestsScreenState extends State<ConnectionRequestsScreen> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Erreur lors de l\'approbation: $e'),
-            backgroundColor: Theme.of(context).colorScheme.error,
+        ShadToaster.of(context).show(
+          ShadToast.destructive(
+            title: const Text('Erreur'),
+            description: Text('Erreur lors de l\'approbation: $e'),
           ),
         );
       }
@@ -256,19 +245,19 @@ class _ConnectionRequestsScreenState extends State<ConnectionRequestsScreen> {
 
       // Show success message
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Text('Demande refusée'),
-            backgroundColor: Theme.of(context).colorScheme.outline,
+        ShadToaster.of(context).show(
+          ShadToast(
+            title: const Text('Demande refusée'),
+            description: const Text('La demande de connexion a été refusée'),
           ),
         );
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Erreur lors du refus: $e'),
-            backgroundColor: Theme.of(context).colorScheme.error,
+        ShadToaster.of(context).show(
+          ShadToast.destructive(
+            title: const Text('Erreur'),
+            description: Text('Erreur lors du refus: $e'),
           ),
         );
       }

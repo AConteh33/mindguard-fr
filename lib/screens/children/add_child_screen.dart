@@ -74,8 +74,10 @@ class _AddChildScreenState extends State<AddChildScreen> {
                       description: 'Entrez manuellement le code d\'invitation unique de votre enfant',
                       icon: Icons.code,
                       onTap: () {
+                        print('Invitation code option tapped'); // Debug log
                         setState(() {
                           _showCodeInput = !_showCodeInput;
+                          print('_showCodeInput is now: $_showCodeInput'); // Debug log
                         });
                       },
                       color: Theme.of(context).colorScheme.secondary,
@@ -100,9 +102,11 @@ class _AddChildScreenState extends State<AddChildScreen> {
                               ShadInput(
                                 placeholder: const Text('Code d\'invitation de votre enfant'),
                                 onChanged: (value) {
+                                  print('Code input changed: "$value"'); // Debug log
                                   setState(() {
                                     _invitationCode = value;
                                   });
+                                  print('_invitationCode is now: "$_invitationCode"'); // Debug log
                                 },
                               ),
                               const SizedBox(height: 16),
@@ -110,9 +114,14 @@ class _AddChildScreenState extends State<AddChildScreen> {
                                 width: double.infinity,
                                 child: ShadButton(
                                   onPressed: _invitationCode.isNotEmpty
-                                    ? () => _connectWithCode()
+                                    ? () {
+                                        print('Button clicked! Code: "$_invitationCode"'); // Debug log
+                                        _connectWithCode();
+                                      }
                                     : null,
-                                  child: const Text('Connecter avec le code'),
+                                  child: Text(_invitationCode.isEmpty 
+                                    ? 'Entrez un code' 
+                                    : 'Connecter avec le code'),
                                 ),
                               ),
                             ],
@@ -223,15 +232,24 @@ class _AddChildScreenState extends State<AddChildScreen> {
   }
 
   Future<void> _connectWithCode() async {
-    if (_invitationCode.isEmpty) return;
+    print('_connectWithCode called with: "$_invitationCode"'); // Debug log
+    
+    if (_invitationCode.isEmpty) {
+      print('Code is empty, returning'); // Debug log
+      return;
+    }
 
     try {
+      print('Starting connection process...'); // Debug log
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
 
       if (authProvider.userModel?.role != 'parent') {
+        print('User is not a parent: ${authProvider.userModel?.role}'); // Debug log
         _showError('Seuls les parents peuvent lier des enfants.');
         return;
       }
+
+      print('User role confirmed as parent'); // Debug log
 
       // Parse the invitation code (format: childId_timestamp or just childId)
       String childId = _invitationCode.trim();
@@ -239,34 +257,50 @@ class _AddChildScreenState extends State<AddChildScreen> {
         childId = childId.split('_')[0];
       }
 
+      print('Parsed childId: "$childId"'); // Debug log
+
       // Verify the child exists by checking their user document
+      print('Checking if child exists...'); // Debug log
       final childDoc = await FirebaseFirestore.instance
           .collection('users')
           .doc(childId)
           .get();
 
       if (!childDoc.exists) {
+        print('Child document does not exist'); // Debug log
         _showError('Code d\'invitation invalide. Enfant non trouvé.');
         return;
       }
 
+      print('Child document exists'); // Debug log
       final childData = childDoc.data() as Map<String, dynamic>;
       if (childData['role'] != 'child') {
+        print('Child role is not "child": ${childData['role']}'); // Debug log
         _showError('Ce code n\'appartient pas à un compte enfant.');
         return;
       }
 
-      // Check if already linked
-      final existingLink = await FirebaseFirestore.instance
+      print('Child role confirmed as "child"'); // Debug log
+
+      // Check if already linked (use single field query to avoid composite index)
+      print('Checking if already linked...'); // Debug log
+      final existingLinks = await FirebaseFirestore.instance
           .collection('parent_child_links')
           .where('parentId', isEqualTo: authProvider.userModel!.uid)
-          .where('childId', isEqualTo: childId)
           .get();
 
-      if (existingLink.docs.isNotEmpty) {
+      final alreadyLinked = existingLinks.docs.any((doc) {
+        final data = doc.data() as Map<String, dynamic>;
+        return data['childId'] == childId;
+      });
+
+      if (alreadyLinked) {
+        print('Child already linked to this parent'); // Debug log
         _showError('Cet enfant est déjà lié à votre compte.');
         return;
       }
+
+      print('Child not yet linked, creating connection request...'); // Debug log
 
       // Create connection request
       await FirebaseFirestore.instance.collection('connection_requests').add({
@@ -280,6 +314,8 @@ class _AddChildScreenState extends State<AddChildScreen> {
         ),
         'connectionMethod': 'invitation_code',
       });
+
+      print('Connection request created successfully'); // Debug log
 
       // Clear the input and show success
       setState(() {
@@ -297,16 +333,18 @@ class _AddChildScreenState extends State<AddChildScreen> {
       });
 
     } catch (e) {
+      print('Error in _connectWithCode: $e'); // Debug log
       _showError('Erreur lors de la connexion: $e');
     }
   }
 
   void _showError(String message) {
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(message),
-          backgroundColor: Theme.of(context).colorScheme.error,
+      // Use ShadCN toast instead of SnackBar
+      ShadToaster.of(context).show(
+        ShadToast.destructive(
+          title: const Text('Erreur'),
+          description: Text(message),
         ),
       );
     }
@@ -314,10 +352,11 @@ class _AddChildScreenState extends State<AddChildScreen> {
 
   void _showSuccess(String message) {
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(message),
-          backgroundColor: Theme.of(context).colorScheme.primary,
+      // Use ShadCN toast instead of SnackBar
+      ShadToaster.of(context).show(
+        ShadToast(
+          title: const Text('Succès'),
+          description: Text(message),
         ),
       );
     }

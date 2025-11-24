@@ -7,10 +7,36 @@ import 'package:shadcn_ui/shadcn_ui.dart';
 import '../providers/auth_provider.dart';
 import 'package:go_router/go_router.dart';
 
-class QrCodeDisplayScreen extends StatelessWidget {
+class QrCodeDisplayScreen extends StatefulWidget {
   const QrCodeDisplayScreen({super.key});
 
   @override
+  State<QrCodeDisplayScreen> createState() => _QrCodeDisplayScreenState();
+}
+
+class _QrCodeDisplayScreenState extends State<QrCodeDisplayScreen> {
+  late String _invitationCode;
+  late String _qrData;
+
+  @override
+  void initState() {
+    super.initState();
+    _generateCodes();
+  }
+
+  void _generateCodes() {
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    
+    // Generate QR code data with format: mindguard://link_child/{childId}/{timestamp}
+    _qrData = 'mindguard://link_child/${authProvider.userModel!.uid}/${DateTime.now().millisecondsSinceEpoch}';
+    
+    // Generate invitation code (full timestamp for consistency)
+    _invitationCode = '${authProvider.userModel!.uid}_${DateTime.now().millisecondsSinceEpoch}';
+    
+    setState(() {});
+  }
+    
+    @override
   Widget build(BuildContext context) {
     final authProvider = Provider.of<AuthProvider>(context);
     
@@ -22,12 +48,6 @@ class QrCodeDisplayScreen extends StatelessWidget {
       );
     }
 
-    // Generate QR code data with format: mindguard://link_child/{childId}/{timestamp}
-    final qrData = 'mindguard://link_child/${authProvider.userModel!.uid}/${DateTime.now().millisecondsSinceEpoch}';
-    
-    // Generate invitation code (simplified version of user ID)
-    final invitationCode = '${authProvider.userModel!.uid}_${DateTime.now().millisecondsSinceEpoch.toString().substring(8)}';
-    
     return Scaffold(
       appBar: AppBar(
         leading: IconButton(
@@ -38,50 +58,62 @@ class QrCodeDisplayScreen extends StatelessWidget {
         ),
         title: const Text('Options de liaison'),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: _generateCodes,
+            tooltip: 'Générer nouveau code',
+          ),
           StreamBuilder<QuerySnapshot>(
             stream: authProvider.userModel != null
                 ? FirebaseFirestore.instance
                     .collection('connection_requests')
                     .where('childId', isEqualTo: authProvider.userModel!.uid)
-                    .where('status', isEqualTo: 'pending')
                     .snapshots()
                 : null,
             builder: (context, snapshot) {
               if (snapshot.hasData && snapshot.data!.docs.isNotEmpty) {
-                return Stack(
-                  children: [
-                    IconButton(
-                      icon: const Icon(Icons.notifications),
-                      onPressed: () {
-                        context.go('/connection-requests');
-                      },
-                    ),
-                    Positioned(
-                      right: 8,
-                      top: 8,
-                      child: Container(
-                        padding: const EdgeInsets.all(2),
-                        decoration: BoxDecoration(
-                          color: Colors.red,
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        constraints: const BoxConstraints(
-                          minWidth: 16,
-                          minHeight: 16,
-                        ),
-                        child: Text(
-                          '${snapshot.data!.docs.length}',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 10,
-                            fontWeight: FontWeight.bold,
+                // Filter pending requests in UI instead of query
+                final pendingCount = snapshot.data!.docs.where((doc) {
+                  final data = doc.data() as Map<String, dynamic>;
+                  return data['status'] == 'pending';
+                }).length;
+                
+                if (pendingCount > 0) {
+                  return Stack(
+                    children: [
+                      IconButton(
+                        icon: const Icon(Icons.notifications),
+                        onPressed: () {
+                          context.go('/connection-requests');
+                        },
+                      ),
+                      Positioned(
+                        right: 8,
+                        top: 8,
+                        child: Container(
+                          padding: const EdgeInsets.all(2),
+                          decoration: BoxDecoration(
+                            color: Colors.red,
+                            borderRadius: BorderRadius.circular(10),
                           ),
-                          textAlign: TextAlign.center,
+                          constraints: const BoxConstraints(
+                            minWidth: 16,
+                            minHeight: 16,
+                          ),
+                          child: Text(
+                            '$pendingCount',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
                         ),
                       ),
-                    ),
-                  ],
-                );
+                    ],
+                  );
+                }
               }
               return IconButton(
                 icon: const Icon(Icons.notifications),
@@ -131,7 +163,7 @@ class QrCodeDisplayScreen extends StatelessWidget {
                           ],
                         ),
                         child: QrImageView(
-                          data: qrData,
+                          data: _qrData,
                           size: 200,
                         ),
                       ),
@@ -180,7 +212,7 @@ class QrCodeDisplayScreen extends StatelessWidget {
                         child: Column(
                           children: [
                             SelectableText(
-                              invitationCode,
+                              _invitationCode,
                               style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                                 fontWeight: FontWeight.bold,
                                 color: Theme.of(context).colorScheme.primary,
@@ -203,11 +235,11 @@ class QrCodeDisplayScreen extends StatelessWidget {
                         child: ShadButton.outline(
                           onPressed: () {
                             // Copy code to clipboard
-                            Clipboard.setData(ClipboardData(text: invitationCode));
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('Code copié dans le presse-papiers!'),
-                                backgroundColor: Colors.green,
+                            Clipboard.setData(ClipboardData(text: _invitationCode));
+                            ShadToaster.of(context).show(
+                              ShadToast(
+                                title: const Text('Code copié'),
+                                description: const Text('Code copié dans le presse-papiers!'),
                               ),
                             );
                           },

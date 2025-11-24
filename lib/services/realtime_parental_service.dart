@@ -38,11 +38,16 @@ class RealtimeParentalService {
     _subscriptions[childId] = _firestore
         .collection('screen_time_limits')
         .where('childId', isEqualTo: childId)
-        .where('isActive', isEqualTo: true)
         .snapshots()
         .listen((snapshot) {
-      if (snapshot.docs.isNotEmpty) {
-        final doc = snapshot.docs.first;
+      // Filter active limits in UI instead of query
+      final activeDocs = snapshot.docs.where((doc) {
+        final data = doc.data() as Map<String, dynamic>;
+        return data['isActive'] == true;
+      }).toList();
+      
+      if (activeDocs.isNotEmpty) {
+        final doc = activeDocs.first;
         final limit = ScreenTimeLimit.fromMap(
           doc.data() as Map<String, dynamic>,
           doc.id,
@@ -328,13 +333,18 @@ class RealtimeParentalService {
     _subscriptions[subscriptionKey] = _firestore
         .collection('child_control_updates')
         .where('childId', isEqualTo: childId)
-        .where('type', isEqualTo: 'control_update')
         .orderBy('timestamp', descending: true)
-        .limit(1)
+        .limit(10) // Get more docs to filter in UI
         .snapshots()
         .listen((snapshot) {
-      if (snapshot.docs.isNotEmpty) {
-        final doc = snapshot.docs.first;
+      // Filter by type in UI instead of query
+      final controlUpdates = snapshot.docs.where((doc) {
+        final data = doc.data() as Map<String, dynamic>;
+        return data['type'] == 'control_update';
+      }).toList();
+      
+      if (controlUpdates.isNotEmpty) {
+        final doc = controlUpdates.first;
         final limitData = doc['limit'] as Map<String, dynamic>;
         final limit = ScreenTimeLimit.fromMap(limitData, doc.id);
         onControlUpdate(limit);

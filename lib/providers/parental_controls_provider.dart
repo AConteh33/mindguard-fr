@@ -31,12 +31,16 @@ class ParentalControlsProvider with ChangeNotifier {
       QuerySnapshot snapshot = await _firestore
           .collection('screen_time_limits')
           .where('childId', isEqualTo: childId)
-          .where('isActive', isEqualTo: true)
-          .limit(1)
           .get();
 
-      if (snapshot.docs.isNotEmpty) {
-        final doc = snapshot.docs.first;
+      // Filter active limits in UI instead of query
+      final activeLimits = snapshot.docs.where((doc) {
+        final data = doc.data() as Map<String, dynamic>;
+        return data['isActive'] == true;
+      }).toList();
+
+      if (activeLimits.isNotEmpty) {
+        final doc = activeLimits.first;
         _screenTimeLimit = ScreenTimeLimit.fromMap(
           doc.data() as Map<String, dynamic>,
           doc.id,

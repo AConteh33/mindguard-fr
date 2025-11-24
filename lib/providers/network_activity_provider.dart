@@ -66,12 +66,17 @@ class NetworkActivityProvider with ChangeNotifier {
       _dnsQueriesSubscription = _firestore
           .collection('dns_queries')
           .where('childId', isEqualTo: childId)
-          .where('timestamp', isGreaterThanOrEqualTo: startDate.millisecondsSinceEpoch)
           .orderBy('timestamp', descending: true)
           .limit(500)
           .snapshots()
           .listen((snapshot) {
+        // Filter by date range in UI instead of query
         _dnsQueries = snapshot.docs
+            .where((doc) {
+              final data = doc.data() as Map<String, dynamic>;
+              final timestamp = data['timestamp'] as int;
+              return timestamp >= startDate.millisecondsSinceEpoch;
+            })
             .map((doc) => doc.data())
             .toList();
         if (kDebugMode) print('Updated DNS queries with ${_dnsQueries.length} records');
@@ -97,12 +102,17 @@ class NetworkActivityProvider with ChangeNotifier {
       final snapshot = await _firestore
           .collection('dns_queries')
           .where('childId', isEqualTo: childId)
-          .where('timestamp', isGreaterThanOrEqualTo: startDate.millisecondsSinceEpoch)
           .orderBy('timestamp', descending: true)
           .limit(500)
           .get();
 
+      // Filter by date range in UI instead of query
       _dnsQueries = snapshot.docs
+          .where((doc) {
+            final data = doc.data() as Map<String, dynamic>;
+            final timestamp = data['timestamp'] as int;
+            return timestamp >= startDate.millisecondsSinceEpoch;
+          })
           .map((doc) => doc.data())
           .toList();
 
@@ -126,12 +136,18 @@ class NetworkActivityProvider with ChangeNotifier {
       final dnsSnapshot = await _firestore
           .collection('dns_queries')
           .where('childId', isEqualTo: childId)
-          .where('timestamp', isGreaterThanOrEqualTo: startDate.millisecondsSinceEpoch)
           .get();
+
+      // Filter by date range in UI instead of query
+      final filteredDocs = dnsSnapshot.docs.where((doc) {
+        final data = doc.data() as Map<String, dynamic>;
+        final timestamp = data['timestamp'] as int;
+        return timestamp >= startDate.millisecondsSinceEpoch;
+      }).toList();
 
       // Calculate top domains
       final domainCounts = <String, int>{};
-      for (var doc in dnsSnapshot.docs) {
+      for (var doc in filteredDocs) {
         final data = doc.data();
         final domain = data['domain'] as String? ?? 'unknown';
         domainCounts[domain] = (domainCounts[domain] ?? 0) + 1;

@@ -61,11 +61,17 @@ class AppUsageProvider with ChangeNotifier {
     QuerySnapshot snapshot = await _firestore
         .collection('app_usage')
         .where('userId', isEqualTo: userId)
-        .where('timestamp', isGreaterThanOrEqualTo: startDate.millisecondsSinceEpoch)
         .orderBy('timestamp', descending: true)
         .get();
 
-    _appUsageData = snapshot.docs
+    // Filter by date range in UI instead of query
+    final filteredDocs = snapshot.docs.where((doc) {
+      final data = doc.data() as Map<String, dynamic>;
+      final timestamp = data['timestamp'] as int;
+      return timestamp >= startDate.millisecondsSinceEpoch;
+    }).toList();
+
+    _appUsageData = filteredDocs
         .map((doc) => {
           'id': doc.id,
           ...doc.data() as Map<String, dynamic>,

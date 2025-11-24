@@ -1,14 +1,15 @@
 import 'package:flutter/material.dart';
-import 'package:shadcn_ui/shadcn_ui.dart';
 import 'package:provider/provider.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:shadcn_ui/shadcn_ui.dart';
 import 'package:go_router/go_router.dart';
 import 'dart:math' as math;
 import '../../providers/auth_provider.dart';
 import '../../providers/mood_provider.dart';
 import '../../providers/focus_session_provider.dart';
 import '../../providers/screen_time_provider.dart';
-import '../../widgets/visual/enhanced_stat_card.dart';
 import '../../widgets/visual/animated_background_visual.dart';
+import '../../widgets/visual/enhanced_stat_card.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -68,10 +69,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
     _emailController.text = userModel.email ?? '';
 
     return Scaffold(
-      body: AnimatedBackgroundVisual(
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              Theme.of(context).colorScheme.primary.withOpacity(0.1),
+              Theme.of(context).colorScheme.secondary.withOpacity(0.1),
+            ],
+          ),
+        ), // Add comma here
         child: SingleChildScrollView(
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
+          child: Padding(
+            padding: const EdgeInsets.all(16.0),
           child: Column(
             children: [
               // User info
@@ -122,38 +133,82 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 children: [
                   SizedBox(
                     width: (MediaQuery.of(context).size.width - 40) / 2 - 12,
-                    child: EnhancedStatCard(
-                      value: '${_getActiveDays(screenTimeProvider)}',
-                      label: 'Jours actif',
-                      icon: Icons.calendar_today,
-                      color: Theme.of(context).colorScheme.primary,
+                    child: Card(
+                      child: Padding(
+                        padding: const EdgeInsets.all(16.0),
+                        child: Column(
+                          children: [
+                            Icon(Icons.calendar_today, 
+                              color: Theme.of(context).colorScheme.primary),
+                            const SizedBox(height: 8),
+                            Text('${_getActiveDays(screenTimeProvider)}',
+                              style: Theme.of(context).textTheme.headlineSmall),
+                            const SizedBox(height: 4),
+                            Text('Jours actif',
+                              style: Theme.of(context).textTheme.bodySmall),
+                          ],
+                        ),
+                      ),
                     ),
                   ),
                   SizedBox(
                     width: (MediaQuery.of(context).size.width - 40) / 2 - 12,
-                    child: EnhancedStatCard(
-                      value: '${moodProvider.moodEntries.length}',
-                      label: 'Entrées humeur',
-                      icon: Icons.mood,
-                      color: Theme.of(context).colorScheme.primary,
+                    child: Card(
+                      child: Padding(
+                        padding: const EdgeInsets.all(16.0),
+                        child: Column(
+                          children: [
+                            Icon(Icons.mood, 
+                              color: Theme.of(context).colorScheme.primary),
+                            const SizedBox(height: 8),
+                            Text('${moodProvider.moodEntries.length}',
+                              style: Theme.of(context).textTheme.headlineSmall),
+                            const SizedBox(height: 4),
+                            Text('Entrées humeur',
+                              style: Theme.of(context).textTheme.bodySmall),
+                          ],
+                        ),
+                      ),
                     ),
                   ),
                   SizedBox(
                     width: (MediaQuery.of(context).size.width - 40) / 2 - 12,
-                    child: EnhancedStatCard(
-                      value: '${focusSessionProvider.sessions.length}',
-                      label: 'Sessions focus',
-                      icon: Icons.do_not_disturb_on,
-                      color: Theme.of(context).colorScheme.primary,
+                    child: Card(
+                      child: Padding(
+                        padding: const EdgeInsets.all(16.0),
+                        child: Column(
+                          children: [
+                            Icon(Icons.do_not_disturb_on, 
+                              color: Theme.of(context).colorScheme.primary),
+                            const SizedBox(height: 8),
+                            Text('${focusSessionProvider.sessions.length}',
+                              style: Theme.of(context).textTheme.headlineSmall),
+                            const SizedBox(height: 4),
+                            Text('Sessions focus',
+                              style: Theme.of(context).textTheme.bodySmall),
+                          ],
+                        ),
+                      ),
                     ),
                   ),
                   SizedBox(
                     width: (MediaQuery.of(context).size.width - 40) / 2 - 12,
-                    child: EnhancedStatCard(
-                      value: '${(_getCompletionRate(focusSessionProvider) * 100).round()}%',
-                      label: 'Taux de réussite',
-                      icon: Icons.star,
-                      color: Theme.of(context).colorScheme.primary,
+                    child: Card(
+                      child: Padding(
+                        padding: const EdgeInsets.all(16.0),
+                        child: Column(
+                          children: [
+                            Icon(Icons.star, 
+                              color: Theme.of(context).colorScheme.primary),
+                            const SizedBox(height: 8),
+                            Text('${(_getCompletionRate(focusSessionProvider) * 100).round()}%',
+                              style: Theme.of(context).textTheme.headlineSmall),
+                            const SizedBox(height: 4),
+                            Text('Taux de réussite',
+                              style: Theme.of(context).textTheme.bodySmall),
+                          ],
+                        ),
+                      ),
                     ),
                   ),
                 ],
@@ -180,9 +235,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           ),
                         ),
                         const SizedBox(height: 4),
-                        ShadInput(
+                        TextFormField(
                           controller: _nameController,
-                          placeholder: const Text('Entrez votre nom complet'),
+                          decoration: const InputDecoration(
+                            labelText: 'Entrez votre nom complet',
+                            border: OutlineInputBorder(),
+                          ),
                         ),
                       ],
                     ),
@@ -197,15 +255,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           ),
                         ),
                         const SizedBox(height: 4),
-                        ShadInput(
+                        TextFormField(
                           controller: _emailController,
-                          placeholder: const Text('Entrez votre adresse e-mail'),
+                          decoration: const InputDecoration(
+                            labelText: 'Entrez votre adresse e-mail',
+                            border: OutlineInputBorder(),
+                          ),
                           enabled: false, // Email shouldn't be editable in this mock
                         ),
                       ],
                     ),
                     const SizedBox(height: 24),
-                    ShadButton(
+                    ElevatedButton(
                       onPressed: () {
                         if (_formKey.currentState!.validate()) {
                           _updateProfile(authProvider);
@@ -227,7 +288,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       style: Theme.of(context).textTheme.titleMedium,
                     ),
                     const SizedBox(height: 16),
-                    ShadCard(
+                    Card(
                       child: Padding(
                         padding: const EdgeInsets.all(16.0),
                         child: Column(
@@ -238,10 +299,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               textAlign: TextAlign.center,
                             ),
                             const SizedBox(height: 16),
-                            ShadButton(
+                            ElevatedButton(
                               onPressed: () {
                                 // Navigate to QR code display screen
-                                context.push('/qr-code');
+                                Navigator.of(context).pushNamed('/qr-code');
                               },
                               child: const Row(
                                 mainAxisAlignment: MainAxisAlignment.center,
@@ -253,58 +314,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               ),
                             ),
                             const SizedBox(height: 16),
-                            Container(
-                              padding: const EdgeInsets.all(12),
-                              decoration: BoxDecoration(
-                                color: Theme.of(context).colorScheme.surface,
-                                borderRadius: BorderRadius.circular(8),
-                                border: Border.all(
-                                  color: Theme.of(context).colorScheme.outline,
-                                ),
-                              ),
-                              child: Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Text(
-                                    'MDGRD-${userModel.uid.substring(0, math.min(6, userModel.uid.length))}',
-                                    style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                                      fontWeight: FontWeight.bold,
-                                      letterSpacing: 2,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  IconButton(
-                                    icon: const Icon(Icons.copy),
-                                    onPressed: () {
-                                      // Copy to clipboard functionality would go here
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        SnackBar(
-                                          content: const Text('Code copié dans le presse-papiers'),
-                                          backgroundColor: Theme.of(context).colorScheme.primary,
-                                        ),
-                                      );
-                                    },
-                                  ),
-                                ],
-                              ),
-                            ),
-                            const SizedBox(height: 16),
-                            ShadButton(
+                            ElevatedButton(
                               onPressed: () {
-                                // Share functionality would go here
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: const Text('Fonctionnalité de partage à implémenter'),
-                                    backgroundColor: Theme.of(context).colorScheme.primary,
-                                  ),
-                                );
+                                // Navigate to QR code display screen instead
+                                Navigator.of(context).pushNamed('/qr-code');
                               },
                               child: const Row(
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
-                                  Icon(Icons.share),
+                                  Icon(Icons.qr_code),
                                   SizedBox(width: 8),
-                                  Text('Partager le code'),
+                                  Text('Voir le QR Code'),
                                 ],
                               ),
                             ),
@@ -320,46 +340,46 @@ class _ProfileScreenState extends State<ProfileScreen> {
               SizedBox(
                 width: double.infinity,
                 child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Actions du compte',
-                    style: Theme.of(context).textTheme.titleMedium,
-                  ),
-                  const SizedBox(height: 16),
-                  ShadButton.outline(
-                    onPressed: () {
-                      _showChangePasswordDialog(context);
-                    },
-                    child: const Text('Changer le mot de passe'),
-                  ),
-                  const SizedBox(height: 12),
-                  ShadButton.outline(
-                    onPressed: () {
-                      _showDeleteAccountDialog(context);
-                    },
-                    child: Text(
-                      'Supprimer le compte',
-                      style: TextStyle(
-                        color: Theme.of(context).colorScheme.error,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Actions du compte',
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
+                    const SizedBox(height: 16),
+                    OutlinedButton(
+                      onPressed: () {
+                        _showChangePasswordDialog(context);
+                      },
+                      child: const Text('Changer le mot de passe'),
+                    ),
+                    const SizedBox(height: 12),
+                    OutlinedButton(
+                      onPressed: () {
+                        _showDeleteAccountDialog(context);
+                      },
+                      child: Text(
+                        'Supprimer le compte',
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.error,
+                        ),
                       ),
                     ),
-                  ),
-                  const SizedBox(height: 12),
-                  ShadButton(
-                    onPressed: () {
-                      _showSignOutDialog(context);
-                    },
-                    child: const Text('Se déconnecter'),
-                  ),
-                ],
-              ),),
+                    const SizedBox(height: 12),
+                    ElevatedButton(
+                      onPressed: () {
+                        _showSignOutDialog(context);
+                      },
+                      child: const Text('Se déconnecter'),
+                    ),
+                  ],
+                ),
+              ),
             ],
           ),
         ),
-      ),
-      ),
-    );
+      ), // This closes the Container
+    ); // This closes the Scaffold
   }
 
   Color _getRoleColor(BuildContext context, String role) {
@@ -423,27 +443,33 @@ class _ProfileScreenState extends State<ProfileScreen> {
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              ShadInput(
+              TextFormField(
                 controller: newPasswordController,
-                placeholder: const Text('Nouveau mot de passe'),
+                decoration: const InputDecoration(
+                  labelText: 'Nouveau mot de passe',
+                  border: OutlineInputBorder(),
+                ),
                 obscureText: true,
               ),
               const SizedBox(height: 12),
-              ShadInput(
+              TextFormField(
                 controller: confirmNewPasswordController,
-                placeholder: const Text('Confirmer le mot de passe'),
+                decoration: const InputDecoration(
+                  labelText: 'Confirmer le mot de passe',
+                  border: OutlineInputBorder(),
+                ),
                 obscureText: true,
               ),
             ],
           ),
           actions: [
-            ShadButton.outline(
+            TextButton(
               onPressed: () {
                 Navigator.of(context).pop();
               },
               child: const Text('Annuler'),
             ),
-            ShadButton(
+            ElevatedButton(
               onPressed: () {
                 // In a real app, this would call the change password API
                 Navigator.of(context).pop();
@@ -473,13 +499,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
             'Êtes-vous sûr de vouloir supprimer votre compte? Cette action est irréversible et toutes vos données seront perdues.',
           ),
           actions: [
-            ShadButton.outline(
+            TextButton(
               onPressed: () {
                 Navigator.of(context).pop();
               },
               child: const Text('Annuler'),
             ),
-            ShadButton(
+            ElevatedButton(
               onPressed: () {
                 // In a real app, this would call the delete account API
                 Navigator.of(context).pop();
@@ -515,18 +541,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
             'Êtes-vous sûr de vouloir vous déconnecter?',
           ),
           actions: [
-            ShadButton.outline(
+            TextButton(
               onPressed: () {
                 Navigator.of(context).pop();
               },
               child: const Text('Annuler'),
             ),
-            ShadButton(
+            ElevatedButton(
               onPressed: () {
                 Navigator.of(context).pop();
                 final authProvider = Provider.of<AuthProvider>(context, listen: false);
                 authProvider.signOut();
-                context.go('/');
+                Navigator.of(context).pushNamedAndRemoveUntil('/', (route) => false);
               },
               child: const Text('Se déconnecter'),
             ),
