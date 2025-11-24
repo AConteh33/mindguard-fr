@@ -20,6 +20,7 @@ import 'package:mindguard_fr/services/realtime_parental_service.dart';
 import 'package:mindguard_fr/services/app_blocking_service.dart';
 import 'package:mindguard_fr/services/screen_time_monitoring_service.dart';
 import 'package:mindguard_fr/services/app_usage_platform_service.dart';
+import 'package:mindguard_fr/services/connection_notification_service.dart';
 import 'package:provider/provider.dart';
 import 'package:shadcn_ui/shadcn_ui.dart';
 import 'package:go_router/go_router.dart';
@@ -36,6 +37,9 @@ void main() async {
   
   // Initialize parental controls services
   await ParentalNotificationService().initialize();
+  
+  // Initialize connection notifications
+  await ConnectionNotificationService().initialize();
 
   // Check and initialize app usage tracking
   await _initializeAppUsageTracking();

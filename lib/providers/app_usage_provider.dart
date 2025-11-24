@@ -58,25 +58,44 @@ class AppUsageProvider with ChangeNotifier {
     final now = DateTime.now();
     final startDate = now.subtract(Duration(days: daysBack));
 
-    QuerySnapshot snapshot = await _firestore
-        .collection('app_usage')
-        .where('userId', isEqualTo: userId)
-        .orderBy('timestamp', descending: true)
-        .get();
+    try {
+      QuerySnapshot snapshot = await _firestore
+          .collection('app_usage')
+          .where('userId', isEqualTo: userId)
+          .orderBy('timestamp', descending: true)
+          .get();
 
-    // Filter by date range in UI instead of query
-    final filteredDocs = snapshot.docs.where((doc) {
-      final data = doc.data() as Map<String, dynamic>;
-      final timestamp = data['timestamp'] as int;
-      return timestamp >= startDate.millisecondsSinceEpoch;
-    }).toList();
+      // Filter by date range in UI instead of query
+      final filteredDocs = snapshot.docs.where((doc) {
+        final data = doc.data() as Map<String, dynamic>;
+        final timestamp = data['timestamp'] as int;
+        return timestamp >= startDate.millisecondsSinceEpoch;
+      }).toList();
 
-    _appUsageData = filteredDocs
-        .map((doc) => {
-          'id': doc.id,
-          ...doc.data() as Map<String, dynamic>,
-        })
-        .toList();
+      _appUsageData = filteredDocs
+          .map((doc) => {
+            'id': doc.id,
+            ...doc.data() as Map<String, dynamic>,
+          })
+          .toList();
+    } catch (e) {
+      if (kDebugMode) print('Error loading app usage data: $e');
+      
+      // Check if it's an index error
+      if (e.toString().contains('requires an index')) {
+        _appUsageData = [];
+        // Show user-friendly message about index setup
+        throw Exception(
+          'Database index required. Please create the app_usage index:\n'
+          'Collection: app_usage\n'
+          'Fields: userId (Ascending), timestamp (Descending)\n'
+          'Or visit: https://console.firebase.google.com/v1/r/project/mind-guard-fr-81a22/firestore/indexes?create_composite=ClVwcm9qZWN0cy9taW5kLWd1YXJkLWZyLTgxYTIyL2RhdGFiYXNlcy8oZGVmYXVsdCkvY29sbGVjdGlvbkdyb3Vwcy9hcHBfdXNhZ2UvaW5kZXhlcy9fEAEaCgoGdXNlcklkEAEaDQoJdGltZXN0YW1wEAIaDAoIX19uYW1lX18QAg'
+        );
+      }
+      
+      _appUsageData = [];
+      rethrow;
+    }
   }
 
   Future<void> addAppUsageEntry(String userId, String packageName, String appName, int usageTimeSeconds) async {

@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:shadcn_ui/shadcn_ui.dart';
 import 'package:provider/provider.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:go_router/go_router.dart';
 import '../providers/auth_provider.dart';
 import '../providers/children_provider.dart';
 import '../models/child_model.dart';
+import '../services/connection_notification_service.dart';
 
 class ConnectionRequestsScreen extends StatefulWidget {
   const ConnectionRequestsScreen({super.key});
@@ -15,10 +17,17 @@ class ConnectionRequestsScreen extends StatefulWidget {
 
 class _ConnectionRequestsScreenState extends State<ConnectionRequestsScreen> {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final ConnectionNotificationService _notificationService = ConnectionNotificationService();
 
   Stream<QuerySnapshot> _getConnectionRequests() {
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
-    if (authProvider.userModel == null) return Stream.empty();
+    if (authProvider.userModel == null) {
+      print('DEBUG: No user logged in');
+      return Stream.empty();
+    }
+    
+    print('DEBUG: Getting requests for childId: ${authProvider.userModel!.uid}');
+    print('DEBUG: User role: ${authProvider.userModel!.role}');
     
     // Use a single field query instead of composite index
     return _firestore
@@ -185,10 +194,17 @@ class _ConnectionRequestsScreenState extends State<ConnectionRequestsScreen> {
 
   Future<void> _approveRequest(String requestId, String parentId, String parentName) async {
     try {
+      print('DEBUG: Approving request - requestId: $requestId, parentId: $parentId, parentName: $parentName');
+      
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
       final childrenProvider = Provider.of<ChildrenProvider>(context, listen: false);
 
-      if (authProvider.userModel == null) return;
+      if (authProvider.userModel == null) {
+        print('DEBUG: No user logged in for approval');
+        return;
+      }
+      
+      print('DEBUG: Current user: ${authProvider.userModel!.uid}, role: ${authProvider.userModel!.role}');
 
       // Create the child-parent link
       final childModel = ChildModel(
@@ -198,14 +214,18 @@ class _ConnectionRequestsScreenState extends State<ConnectionRequestsScreen> {
         isActive: true,
         createdAt: DateTime.now(),
       );
-
+      
+      print('DEBUG: Creating child link...');
       await childrenProvider.addChild(childModel);
+      print('DEBUG: Child link created successfully');
 
       // Update the connection request status
+      print('DEBUG: Updating request status...');
       await _firestore.collection('connection_requests').doc(requestId).update({
         'status': 'approved',
         'approvedAt': FieldValue.serverTimestamp(),
       });
+      print('DEBUG: Request status updated successfully');
 
       // Show success message
       if (mounted) {
@@ -216,10 +236,14 @@ class _ConnectionRequestsScreenState extends State<ConnectionRequestsScreen> {
           ),
         );
         
+        // Send approval notification
+        await _notificationService.showApprovalNotification(parentName);
+        
         // Navigate back after a short delay
         Future.delayed(const Duration(seconds: 2), () {
           if (mounted) {
-            Navigator.of(context).pop();
+            // Use context.go instead of Navigator.pop to avoid stack issues
+            context.go('/profile');
           }
         });
       }

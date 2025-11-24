@@ -29,7 +29,21 @@ class MoodProvider with ChangeNotifier {
     } catch (e) {
       // Handle error appropriately
       if (kDebugMode) print('Error loading mood entries: $e');
+      
+      // Check if it's an index error
+      if (e.toString().contains('requires an index')) {
+        _moodEntries = [];
+        // Show user-friendly message about index setup
+        throw Exception(
+          'Database index required. Please create the mood_entries index:\n'
+          'Collection: mood_entries\n'
+          'Fields: userId (Ascending), timestamp (Descending)\n'
+          'Or visit: https://console.firebase.google.com/v1/r/project/mind-guard-fr-81a22/firestore/indexes?create_composite=Clhwcm9qZWN0cy9taW5kLWd1YXJkLWZyLTgxYTIyL2RhdGFiYXNlcy8oZGVmYXVsdCkvY29sbGVjdGlvbkdyb3Vwcy9tb29kX2VudHJpZXMvaW5kZXhlcy9fEAEaCgoGdXNlcklkEAEaDQoJdGltZXN0YW1wEAIaDAoIX19uYW1lX18QAg'
+        );
+      }
+      
       _moodEntries = [];
+      rethrow;
     } finally {
       _isLoading = false;
       notifyListeners();

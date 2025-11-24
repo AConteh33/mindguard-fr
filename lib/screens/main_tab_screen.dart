@@ -98,35 +98,105 @@ class _MainTabScreenState extends State<MainTabScreen> {
     final userRole = authProvider.userModel?.role ?? 'child';
     
     return Scaffold(
-      appBar: AppBar(
-        title: Text(
-          _getAppBarTitle(userRole, _currentIndex),
-          style: Theme.of(context).textTheme.titleLarge?.copyWith(
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        actions: [
-          IconButton(
-            onPressed: () => _showQuickSignOutDialog(context),
-            icon: Icon(
-              Icons.logout,
-              color: Theme.of(context).colorScheme.error,
+      body: Column(
+        children: [
+          // Tiny settings bar for child users
+          if (userRole == 'child')
+            Container(
+              height: 40,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.surface,
+                border: Border(
+                  bottom: BorderSide(
+                    color: Theme.of(context).dividerColor.withOpacity(0.3),
+                    width: 0.5,
+                  ),
+                ),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  GestureDetector(
+                    onTap: () {
+                      // Navigate to settings screen (index 4 for child)
+                      _onTabTapped(4);
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).colorScheme.primary.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.settings,
+                            size: 16,
+                            color: Theme.of(context).colorScheme.primary,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            'Paramètres',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Theme.of(context).colorScheme.primary,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
-            tooltip: 'Se déconnecter',
+          
+          // Main content
+          Expanded(
+            child: Column(
+              children: [
+                // AppBar (only show if not child or if child has no settings bar)
+                if (userRole != 'child')
+                  AppBar(
+                    title: Text(
+                      _getAppBarTitle(userRole, _currentIndex),
+                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    actions: [
+                      IconButton(
+                        onPressed: () => _showQuickSignOutDialog(context),
+                        icon: Icon(
+                          Icons.logout,
+                          color: Theme.of(context).colorScheme.error,
+                        ),
+                        tooltip: 'Se déconnecter',
+                      ),
+                      const SizedBox(width: 8),
+                    ],
+                    elevation: 0,
+                    backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+                  ),
+                
+                // PageView content
+                Expanded(
+                  child: PageView(
+                    controller: _pageController,
+                    onPageChanged: (index) {
+                      setState(() {
+                        _currentIndex = index;
+                      });
+                    },
+                    children: _screens,
+                  ),
+                ),
+              ],
+            ),
           ),
-          const SizedBox(width: 8),
         ],
-        elevation: 0,
-        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      ),
-      body: PageView(
-        controller: _pageController,
-        onPageChanged: (index) {
-          setState(() {
-            _currentIndex = index;
-          });
-        },
-        children: _screens,
       ),
       bottomNavigationBar: Container(
         decoration: BoxDecoration(

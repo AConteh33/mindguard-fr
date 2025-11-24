@@ -74,7 +74,21 @@ class FocusSessionProvider with ChangeNotifier {
           .toList();
     } catch (e) {
       if (kDebugMode) print('Error loading focus sessions: $e');
+      
+      // Check if it's an index error
+      if (e.toString().contains('requires an index')) {
+        _sessions = [];
+        // Show user-friendly message about index setup
+        throw Exception(
+          'Database index required. Please create the focus_sessions index:\n'
+          'Collection: focus_sessions\n'
+          'Fields: userId (Ascending), startTime (Descending)\n'
+          'Or visit: https://console.firebase.google.com/v1/r/project/mind-guard-fr-81a22/firestore/indexes?create_composite=Clpwcm9qZWN0cy9taW5kLWd1YXJkLWZyLTgxYTIyL2RhdGFiYXNlcy8oZGVmYXVsdCkvY29sbGVjdGlvbkdyb3Vwcy9mb2N1c19zZXNzaW9ucy9pbmRleGVzL18QARoKCgZ1c2VySWQQARoNCglzdGFydFRpbWUQAhoMCghfX25hbWVfXxAC'
+        );
+      }
+      
       _sessions = [];
+      rethrow;
     } finally {
       _isLoading = false;
       notifyListeners();
