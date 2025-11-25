@@ -5,6 +5,8 @@ class ScreenTimeProvider with ChangeNotifier {
   Map<String, dynamic>? _screenTimeData;
   bool _isLoading = false;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  StreamSubscription<DocumentSnapshot>? _screenTimeSubscription;
+  StreamSubscription<QuerySnapshot>? _usageSubscription;
 
   Map<String, dynamic>? get screenTimeData => _screenTimeData;
   bool get isLoading => _isLoading;
@@ -39,6 +41,146 @@ class ScreenTimeProvider with ChangeNotifier {
       _isLoading = false;
       notifyListeners();
     }
+  }
+
+  // Start real-time listening for screen time data
+  Future<void> startRealtimeListening(String userId) async {
+    // Stop existing subscription if any
+    await _screenTimeSubscription?.cancel();
+    
+    _screenTimeSubscription = _firestore
+        .collection('screen_time')
+        .doc(userId)
+        .snapshots()
+        .listen((DocumentSnapshot snapshot) {
+      if (snapshot.exists) {
+        _screenTimeData = snapshot.data() as Map<String, dynamic>?;
+      } else {
+        _screenTimeData = {
+          'daily': <String, dynamic>{},
+          'weekly': <String, dynamic>{},
+          'appUsage': <String, dynamic>{},
+          'updatedAt': FieldValue.serverTimestamp(),
+        };
+      }
+      notifyListeners();
+      
+      if (kDebugMode) print('Screen time data updated in real-time');
+    }, onError: (error) {
+      if (kDebugMode) print('Error in real-time screen time listening: $error');
+    });
+  }
+
+  // Start real-time listening for screen time usage data (from monitoring service)
+  Future<void> startUsageRealtimeListening(String userId) async {
+    // Stop existing subscription if any
+    await _usageSubscription?.cancel();
+    
+    final today = DateTime.now();
+    final dateString = '${today.year}-${today.month.toString().padLeft(2, '0')}-${today.day.toString().padLeft(2, '0')}';
+    
+    _usageSubscription = _firestore
+        .collection('screen_time_usage')
+        .where('childId', isEqualTo: userId)
+        .where('date', isEqualTo: dateString)
+        .snapshots()
+        .listen((QuerySnapshot snapshot) {
+      if (snapshot.docs.isNotEmpty) {
+        final doc = snapshot.docs.first;
+        final usageData = doc.data() as Map<String, dynamic>;
+        
+        // Update screen time data with real-time usage
+        _screenTimeData = {
+          'daily': {
+            today.toString().split(' ')[0]: {
+              'minutes': usageData['totalMinutesUsed'] ?? 0,
+              'appUsage': usageData['appUsage'] ?? {},
+              'lastUpdated': usageData['lastUpdated'],
+            }
+          },
+          'appUsage': usageData['appUsage'] ?? {},
+          'totalMinutesToday': usageData['totalMinutesUsed'] ?? 0,
+          'lastUpdated': usageData['lastUpdated'],
+          'timeBlocks': usageData['timeBlocks'] ?? [],
+        };
+        
+        notifyListeners();
+        
+        if (kDebugMode) print('Screen time usage data updated in real-time');
+      }
+    }, onError: (error) {
+      if (kDebugMode) print('Error in real-time usage listening: $error');
+    });
+  }
+
+  // Start real-time listening for parent to monitor children
+  Future<void> startChildrenRealtimeListening(List<String> childrenIds) async {
+    // Stop existing subscription if any
+    await _usageSubscription?.cancel();
+    
+    final today = DateTime.now();
+    final dateString = '${today.year}-${today.month.toString().padLeft(2, '0')}-${today.day.toString().padLeft(2, '0')}';
+    
+    _usageSubscription = _firestore
+        .collection('screen_time_usage')
+        .where('childId', whereIn: childrenIds)
+        .where('date', isEqualTo: dateString)
+        .snapshots()
+        .listen((QuerySnapshot snapshot) {
+      
+      // Aggregate all children's data
+      final Map<String, dynamic> aggregatedData = {
+        'daily': <String, dynamic>{},
+        'appUsage': <String, dynamic>{},
+        'children': <String, dynamic>{},
+        'totalMinutesToday': 0,
+        'lastUpdated': Timestamp.now(),
+      };
+      
+      for (final doc in snapshot.docs) {
+        final usageData = doc.data() as Map<String, dynamic>;
+        final childId = usageData['childId'] as String;
+        
+        // Add child's data to aggregated results
+        aggregatedData['children'][childId] = {
+          'minutes': usageData['totalMinutesUsed'] ?? 0,
+          'appUsage': usageData['appUsage'] ?? {},
+          'lastUpdated': usageData['lastUpdated'],
+        };
+        
+        // Aggregate total minutes
+        aggregatedData['totalMinutesToday'] = (aggregatedData['totalMinutesToday'] as int) + 
+            (usageData['totalMinutesUsed'] as int? ?? 0);
+        
+        // Aggregate app usage
+        final childAppUsage = usageData['appUsage'] as Map<String, dynamic>? ?? {};
+        for (final entry in childAppUsage.entries) {
+          final appName = entry.key;
+          final minutes = entry.value as int? ?? 0;
+          aggregatedData['appUsage'][appName] = (aggregatedData['appUsage'][appName] as int? ?? 0) + minutes;
+        }
+      }
+      
+      _screenTimeData = aggregatedData;
+      notifyListeners();
+      
+      if (kDebugMode) print('Children screen time data updated in real-time');
+    }, onError: (error) {
+      if (kDebugMode) print('Error in real-time children listening: $error');
+    });
+  }
+  Future<void> stopRealtimeListening() async {
+    await _screenTimeSubscription?.cancel();
+    await _usageSubscription?.cancel();
+    _screenTimeSubscription = null;
+    _usageSubscription = null;
+  }
+
+  @override
+  void dispose() {
+    _screenTimeSubscription?.cancel();
+    _usageSubscription?.cancel();
+    super.dispose();
   }
 
   Future<void> updateScreenTime(String userId, Map<String, dynamic> data) async {

@@ -1,5 +1,6 @@
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'package:mindguard_fr/providers/auth_provider.dart';
 import 'package:mindguard_fr/providers/theme_provider.dart';
 import 'package:mindguard_fr/providers/mood_provider.dart';
@@ -21,6 +22,7 @@ import 'package:mindguard_fr/services/app_blocking_service.dart';
 import 'package:mindguard_fr/services/screen_time_monitoring_service.dart';
 import 'package:mindguard_fr/services/app_usage_platform_service.dart';
 import 'package:mindguard_fr/services/connection_notification_service.dart';
+import 'package:mindguard_fr/services/permission_service.dart';
 import 'package:provider/provider.dart';
 import 'package:shadcn_ui/shadcn_ui.dart';
 import 'package:go_router/go_router.dart';
@@ -40,6 +42,9 @@ void main() async {
   
   // Initialize connection notifications
   await ConnectionNotificationService().initialize();
+
+  // Initialize permission service
+  await _initializePermissions();
 
   // Check and initialize app usage tracking
   await _initializeAppUsageTracking();
@@ -146,5 +151,33 @@ Future<void> _initializeAppUsageTracking() async {
     }
   } catch (e) {
     print('Error initializing app usage tracking: $e');
+  }
+}
+
+// Initialize permissions
+Future<void> _initializePermissions() async {
+  try {
+    // Initialize permission service
+    final permissionService = PermissionService();
+    
+    // Check critical permissions
+    final cameraPermission = await permissionService.hasCameraPermission();
+    final microphonePermission = await permissionService.hasMicrophonePermission();
+    final storagePermission = await permissionService.hasStoragePermission();
+    final notificationPermission = await permissionService.hasNotificationPermission();
+    
+    print('Permission Status:');
+    print('Camera: ${cameraPermission ? "Granted" : "Denied"}');
+    print('Microphone: ${microphonePermission ? "Granted" : "Denied"}');
+    print('Storage: ${storagePermission ? "Granted" : "Denied"}');
+    print('Notifications: ${notificationPermission ? "Granted" : "Denied"}');
+    
+    // Request notification permissions if not granted
+    if (!notificationPermission) {
+      await permissionService.requestNotificationPermission();
+    }
+    
+  } catch (e) {
+    print('Error initializing permissions: $e');
   }
 }

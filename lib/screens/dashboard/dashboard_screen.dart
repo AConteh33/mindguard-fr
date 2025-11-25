@@ -63,6 +63,20 @@ class _DashboardScreenState extends State<DashboardScreen> {
         final userRole = authProvider.userModel!.role;
         
         screenTimeProvider.loadScreenTimeData(userId);
+        
+        // Start real-time listening based on user role
+        if (userRole == 'child') {
+          await screenTimeProvider.startUsageRealtimeListening(userId);
+        } else if (userRole == 'parent') {
+          // Get children IDs and start listening
+          await childrenProvider.loadChildrenForParent(userId);
+          final children = childrenProvider.children;
+          if (children.isNotEmpty) {
+            final childrenIds = children.map((child) => child['id'] as String).toList();
+            await screenTimeProvider.startChildrenRealtimeListening(childrenIds);
+          }
+        }
+        
         moodProvider.loadMoodEntries(userId);
         appUsageProvider.loadAppUsageData(userId, daysBack: 1); // Load today's data only
         focusSessionProvider.loadFocusSessions(userId);
@@ -758,5 +772,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
       icon: icon,
       color: color,
     );
+  }
+
+  @override
+  void dispose() {
+    // Stop real-time listening when dashboard is disposed
+    final screenTimeProvider = Provider.of<ScreenTimeProvider>(context, listen: false);
+    screenTimeProvider.stopRealtimeListening();
+    super.dispose();
   }
 }

@@ -3,10 +3,15 @@ import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shadcn_ui/shadcn_ui.dart';
 import '../providers/auth_provider.dart';
+import '../providers/parental_controls_provider.dart';
+import '../providers/children_provider.dart';
 import '../utils/responsive_helper.dart';
 import '../widgets/responsive/responsive_builder.dart';
 import '../widgets/responsive/responsive_layout.dart';
+import '../widgets/responsive/responsive_text.dart';
 import '../widgets/responsive/responsive_container.dart';
+import '../services/screen_time_monitoring_service.dart';
+import '../services/app_blocking_service.dart';
 
 // Import your main tab screens
 import 'dashboard/dashboard_screen.dart';
@@ -34,6 +39,9 @@ class _MainTabScreenState extends State<MainTabScreen> {
   late PageController _pageController;
   int _currentIndex = 0;
   late List<Widget> _screens;
+  final ScreenTimeMonitoringService _screenTimeService = ScreenTimeMonitoringService();
+  final AppBlockingService _appBlockingService = AppBlockingService();
+  bool _isMonitoringInitialized = false;
 
   @override
   void initState() {
@@ -41,6 +49,11 @@ class _MainTabScreenState extends State<MainTabScreen> {
     _pageController = PageController(initialPage: widget.initialIndex);
     _currentIndex = widget.initialIndex;
     _buildScreens();
+    
+    // Initialize screen time monitoring for child users
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _initializeScreenTimeMonitoring();
+    });
   }
 
   void _buildScreens() {
@@ -82,7 +95,82 @@ class _MainTabScreenState extends State<MainTabScreen> {
   @override
   void dispose() {
     _pageController.dispose();
+    // Stop screen time monitoring when app is closed
+    if (_isMonitoringInitialized) {
+      _screenTimeService.stopMonitoring();
+      _appBlockingService.stopBlocking();
+    }
     super.dispose();
+  }
+
+  // Initialize screen time monitoring for child users
+  Future<void> _initializeScreenTimeMonitoring() async {
+    if (_isMonitoringInitialized) return;
+    
+    try {
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      final userRole = authProvider.userModel?.role ?? 'child';
+      
+      // Only start monitoring for child users
+      if (userRole == 'child' && authProvider.userModel != null) {
+        final childId = authProvider.userModel!.uid;
+        
+        // Get parent ID and parental controls
+        final childrenProvider = Provider.of<ChildrenProvider>(context, listen: false);
+        await childrenProvider.getParentForChild(childId);
+        
+        final parentalControlsProvider = Provider.of<ParentalControlsProvider>(context, listen: false);
+        await parentalControlsProvider.loadScreenTimeLimit(childId);
+        
+        // Get parent ID (if linked)
+        String? parentId;
+        final parentData = childrenProvider.parentData;
+        if (parentData != null) {
+          parentId = parentData['id'] as String?;
+        }
+        
+        if (parentId != null) {
+          // Start screen time monitoring
+          await _screenTimeService.startMonitoring(
+            childId: childId,
+            parentId: parentId,
+            parentalControlsProvider: parentalControlsProvider,
+          );
+          
+          // Start app blocking service
+          await _appBlockingService.startBlocking(
+            childId: childId,
+            parentId: parentId,
+            parentalControlsProvider: parentalControlsProvider,
+          );
+          
+          _isMonitoringInitialized = true;
+          
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: const Text('Suivi du temps d\'écran activé'),
+                duration: const Duration(seconds: 2),
+                behavior: SnackBarBehavior.floating,
+              ),
+            );
+          }
+          
+          print('Screen time monitoring started for child: $childId');
+        }
+      }
+    } catch (e) {
+      print('Error initializing screen time monitoring: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('Erreur lors de l\'activation du suivi du temps d\'écran'),
+            duration: const Duration(seconds: 3),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    }
   }
 
   void _onTabTapped(int index) {
