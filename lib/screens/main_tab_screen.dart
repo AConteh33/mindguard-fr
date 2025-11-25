@@ -3,6 +3,10 @@ import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shadcn_ui/shadcn_ui.dart';
 import '../providers/auth_provider.dart';
+import '../utils/responsive_helper.dart';
+import '../widgets/responsive/responsive_builder.dart';
+import '../widgets/responsive/responsive_layout.dart';
+import '../widgets/responsive/responsive_container.dart';
 
 // Import your main tab screens
 import 'dashboard/dashboard_screen.dart';
@@ -97,6 +101,14 @@ class _MainTabScreenState extends State<MainTabScreen> {
     final authProvider = Provider.of<AuthProvider>(context);
     final userRole = authProvider.userModel?.role ?? 'child';
     
+    return ResponsiveLayout(
+      mobile: _buildMobileLayout(context, userRole),
+      tablet: _buildTabletLayout(context, userRole),
+      desktop: _buildDesktopLayout(context, userRole),
+    );
+  }
+
+  Widget _buildMobileLayout(BuildContext context, String userRole) {
     return Scaffold(
       body: Column(
         children: [
@@ -155,75 +167,259 @@ class _MainTabScreenState extends State<MainTabScreen> {
           
           // Main content
           Expanded(
-            child: Column(
-              children: [
-                // AppBar (only show if not child or if child has no settings bar)
-                if (userRole != 'child')
-                  AppBar(
-                    title: Text(
-                      _getAppBarTitle(userRole, _currentIndex),
-                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    actions: [
-                      IconButton(
-                        onPressed: () => _showQuickSignOutDialog(context),
-                        icon: Icon(
-                          Icons.logout,
-                          color: Theme.of(context).colorScheme.error,
-                        ),
-                        tooltip: 'Se déconnecter',
-                      ),
-                      const SizedBox(width: 8),
-                    ],
-                    elevation: 0,
-                    backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-                  ),
-                
-                // PageView content
-                Expanded(
-                  child: PageView(
-                    controller: _pageController,
-                    onPageChanged: (index) {
-                      setState(() {
-                        _currentIndex = index;
-                      });
-                    },
-                    children: _screens,
-                  ),
-                ),
-              ],
+            child: PageView(
+              controller: _pageController,
+              onPageChanged: (index) {
+                setState(() {
+                  _currentIndex = index;
+                });
+              },
+              children: _screens,
             ),
           ),
         ],
       ),
-      bottomNavigationBar: Container(
-        decoration: BoxDecoration(
-          color: Theme.of(context).scaffoldBackgroundColor,
-          borderRadius: const BorderRadius.only(
-            topLeft: Radius.circular(10.0),
-            topRight: Radius.circular(10.0),
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.1),
-              spreadRadius: 0,
-              blurRadius: 10,
-              offset: const Offset(0, -2),
+      bottomNavigationBar: _buildBottomNavigationBar(userRole),
+    );
+  }
+
+  Widget _buildTabletLayout(BuildContext context, String userRole) {
+    return Scaffold(
+      body: Row(
+        children: [
+          // Side navigation for tablet
+          if (userRole == 'child')
+            Container(
+              width: 60,
+              color: Theme.of(context).colorScheme.surface,
+              child: Column(
+                children: [
+                  // Settings button at top
+                  Padding(
+                    padding: const EdgeInsets.all(8.0),
+                    child: IconButton(
+                      onPressed: () => _onTabTapped(4),
+                      icon: Icon(
+                        Icons.settings,
+                        color: Theme.of(context).colorScheme.primary,
+                      ),
+                      tooltip: 'Paramètres',
+                    ),
+                  ),
+                  const Divider(),
+                  // Navigation items
+                  Expanded(
+                    child: _buildSideNavigation(userRole),
+                  ),
+                ],
+              ),
+            )
+          else
+            Container(
+              width: 80,
+              color: Theme.of(context).colorScheme.surface,
+              child: _buildSideNavigation(userRole),
             ),
-          ],
-        ),
-        child: BottomNavigationBar(
-          currentIndex: _currentIndex,
-          onTap: _onTabTapped,
-          type: BottomNavigationBarType.fixed,
-          backgroundColor: Colors.transparent,
-          elevation: 0,
-          items: _getBottomNavItems(userRole),
-        ),
+          
+          // Main content
+          Expanded(
+            child: PageView(
+              controller: _pageController,
+              onPageChanged: (index) {
+                setState(() {
+                  _currentIndex = index;
+                });
+              },
+              children: _screens,
+            ),
+          ),
+        ],
       ),
     );
+  }
+
+  Widget _buildDesktopLayout(BuildContext context, String userRole) {
+    return Scaffold(
+      body: Row(
+        children: [
+          // Persistent side navigation for desktop
+          Container(
+            width: ResponsiveHelper.isDesktop(context) ? 250 : 200,
+            color: Theme.of(context).colorScheme.surface,
+            child: Column(
+              children: [
+                // App header
+                Container(
+                  padding: ResponsiveHelper.getResponsivePadding(context),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.psychology,
+                        color: Theme.of(context).colorScheme.primary,
+                        size: ResponsiveHelper.getResponsiveIconSize(context, 32),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: ResponsiveText(
+                          'MindGuard',
+                          style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                            fontWeight: FontWeight.bold,
+                            color: Theme.of(context).colorScheme.primary,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      if (userRole == 'child')
+                        IconButton(
+                          onPressed: () => _onTabTapped(4),
+                          icon: Icon(
+                            Icons.settings,
+                            color: Theme.of(context).colorScheme.primary,
+                          ),
+                          tooltip: 'Paramètres',
+                        ),
+                    ],
+                  ),
+                ),
+                const Divider(),
+                // Navigation items
+                Expanded(
+                  child: _buildExpandedSideNavigation(userRole),
+                ),
+              ],
+            ),
+          ),
+          
+          // Main content with proper max width
+          Expanded(
+            child: ResponsiveContainer(
+              child: PageView(
+                controller: _pageController,
+                onPageChanged: (index) {
+                  setState(() {
+                    _currentIndex = index;
+                  });
+                },
+                children: _screens,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBottomNavigationBar(String userRole) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Theme.of(context).scaffoldBackgroundColor,
+        borderRadius: const BorderRadius.only(
+          topLeft: Radius.circular(10.0),
+          topRight: Radius.circular(10.0),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.1),
+            spreadRadius: 0,
+            blurRadius: 10,
+            offset: const Offset(0, -2),
+          ),
+        ],
+      ),
+      child: BottomNavigationBar(
+        currentIndex: _currentIndex,
+        onTap: _onTabTapped,
+        type: BottomNavigationBarType.fixed,
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        items: _getBottomNavItems(userRole),
+      ),
+    );
+  }
+
+  Widget _buildSideNavigation(String userRole) {
+    final navItems = _getSideNavItems(userRole);
+    
+    return ListView.builder(
+      padding: EdgeInsets.zero,
+      itemCount: navItems.length,
+      itemBuilder: (context, index) {
+        final item = navItems[index];
+        final isSelected = _currentIndex == index;
+        
+        return ListTile(
+          leading: Icon(
+            item['icon'],
+            color: isSelected ? Theme.of(context).colorScheme.primary : null,
+          ),
+          title: null, // Remove text labels
+          selected: isSelected,
+          onTap: () => _onTabTapped(index),
+        );
+      },
+    );
+  }
+
+  Widget _buildExpandedSideNavigation(String userRole) {
+    final navItems = _getSideNavItems(userRole);
+    
+    return ListView.builder(
+      padding: ResponsiveHelper.getResponsivePadding(context),
+      itemCount: navItems.length,
+      itemBuilder: (context, index) {
+        final item = navItems[index];
+        final isSelected = _currentIndex == index;
+        
+        return Container(
+          margin: const EdgeInsets.symmetric(vertical: 4),
+          decoration: BoxDecoration(
+            color: isSelected ? Theme.of(context).colorScheme.primary.withOpacity(0.1) : null,
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: ListTile(
+            leading: Icon(
+              item['icon'],
+              color: isSelected ? Theme.of(context).colorScheme.primary : null,
+            ),
+            title: null, // Remove text labels
+            selected: isSelected,
+            onTap: () => _onTabTapped(index),
+          ),
+        );
+      },
+    );
+  }
+
+  List<Map<String, dynamic>> _getSideNavItems(String userRole) {
+    switch (userRole) {
+      case 'parent':
+        return [
+          {'icon': Icons.dashboard, 'label': 'Tableau de bord'},
+          {'icon': Icons.chat, 'label': 'Messages'},
+          {'icon': Icons.timer, 'label': 'Focus'},
+          {'icon': Icons.supervisor_account, 'label': 'Enfants'},
+          {'icon': Icons.person, 'label': 'Profil'},
+        ];
+      case 'psychologist':
+        return [
+          {'icon': Icons.dashboard, 'label': 'Tableau de bord'},
+          {'icon': Icons.people, 'label': 'Patients'},
+          {'icon': Icons.calendar_today, 'label': 'Agenda'},
+          {'icon': Icons.chat, 'label': 'Messages'},
+          {'icon': Icons.person, 'label': 'Profil'},
+          {'icon': Icons.settings, 'label': 'Paramètres'},
+        ];
+      case 'child':
+      default:
+        return [
+          {'icon': Icons.dashboard, 'label': 'Tableau de bord'},
+          {'icon': Icons.chat, 'label': 'Messages'},
+          {'icon': Icons.timer, 'label': 'Concentration'},
+          {'icon': Icons.person, 'label': 'Profil'},
+          {'icon': Icons.settings, 'label': 'Paramètres'},
+        ];
+    }
   }
 
   List<BottomNavigationBarItem> _getBottomNavItems(String userRole) {
@@ -238,9 +434,10 @@ class _MainTabScreenState extends State<MainTabScreen> {
         ];
       case 'psychologist':
         return [
+          _buildBottomNavItem(Icons.dashboard, 'Tableau de bord'),
+          _buildBottomNavItem(Icons.people, 'Patients'),
           _buildBottomNavItem(Icons.calendar_today, 'Agenda'),
           _buildBottomNavItem(Icons.chat, 'Messages'),
-          _buildBottomNavItem(Icons.timer, 'Focus'),
           _buildBottomNavItem(Icons.person, 'Profil'),
           _buildBottomNavItem(Icons.settings, 'Paramètres'),
         ];

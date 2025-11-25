@@ -2,6 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:shadcn_ui/shadcn_ui.dart';
 import '../../providers/auth_provider.dart';
+import '../../utils/responsive_helper.dart';
+import '../../widgets/responsive/responsive_builder.dart';
+import '../../widgets/responsive/responsive_layout.dart';
+import '../../widgets/responsive/responsive_container.dart';
+import '../../widgets/responsive/responsive_grid.dart';
+import '../../widgets/responsive/responsive_card.dart';
+import '../../widgets/responsive/responsive_text.dart';
+import '../../widgets/responsive/responsive_icon.dart';
 import '../../widgets/visual/animated_background_visual.dart';
 import 'psychologist_profile_screen.dart';
 
@@ -188,13 +196,15 @@ class _PsychologistDirectoryScreenState extends State<PsychologistDirectoryScree
                   ? const Center(child: CircularProgressIndicator())
                   : _filteredPsychologists.isEmpty
                       ? _buildEmptyState()
-                      : ListView.builder(
-                          padding: const EdgeInsets.all(16),
-                          itemCount: _filteredPsychologists.length,
-                          itemBuilder: (context, index) {
-                            final psychologist = _filteredPsychologists[index];
+                      : ResponsiveGrid(
+                          mobileColumns: 1,
+                          tabletColumns: 2,
+                          desktopColumns: 3,
+                          spacing: ResponsiveHelper.getResponsiveSpacing(context, 16),
+                          runSpacing: ResponsiveHelper.getResponsiveSpacing(context, 16),
+                          children: _filteredPsychologists.map((psychologist) {
                             return _buildPsychologistCard(psychologist);
-                          },
+                          }).toList(),
                         ),
             ),
           ],
@@ -231,196 +241,187 @@ class _PsychologistDirectoryScreenState extends State<PsychologistDirectoryScree
   }
 
   Widget _buildPsychologistCard(Map<String, dynamic> psychologist) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: 16),
-      child: InkWell(
-        onTap: () {
-          Navigator.of(context).push(
-            MaterialPageRoute(
-              builder: (context) => PsychologistProfileScreen(
-                psychologistData: psychologist,
-              ),
+    return ResponsiveCard(
+      onTap: () {
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (context) => PsychologistProfileScreen(
+              psychologistData: psychologist,
             ),
-          );
-        },
-        borderRadius: BorderRadius.circular(12),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          ),
+        );
+      },
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header with name and verified badge
+          Row(
             children: [
-              // Header with name and verified badge
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      psychologist['name'],
-                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
+              Expanded(
+                child: ResponsiveText(
+                  psychologist['name'],
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
                   ),
-                  if (psychologist['verified'] == true)
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: Colors.green.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: Colors.green.withOpacity(0.3)),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            Icons.verified,
-                            size: 16,
-                            color: Colors.green,
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            'Vérifié',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: Colors.green,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                ],
-              ),
-              
-              const SizedBox(height: 8),
-              
-              // Specialty
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.primary.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: Text(
-                  psychologist['specialty'],
-                  style: TextStyle(
-                    color: Theme.of(context).colorScheme.primary,
-                    fontWeight: FontWeight.w500,
-                    fontSize: 12,
-                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
-              
-              const SizedBox(height: 12),
-              
-              // Description
-              Text(
-                psychologist['description'],
-                style: Theme.of(context).textTheme.bodyMedium,
-                maxLines: 2,
+              if (psychologist['verified'] == true)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: Colors.green.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.green.withOpacity(0.3)),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      ResponsiveIcon(
+                        Icons.verified,
+                        size: 16,
+                        color: Colors.green,
+                      ),
+                      const SizedBox(width: 4),
+                      ResponsiveText(
+                        'Vérifié',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.green,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+            ],
+          ),
+          
+          const SizedBox(height: 8),
+          
+          // Specialty
+          ConstrainedBox(
+            constraints: BoxConstraints(
+              maxWidth: ResponsiveHelper.getSafeTextMaxWidth(context) * 0.6,
+            ),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.primary.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: ResponsiveText(
+                psychologist['specialty'],
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.primary,
+                  fontWeight: FontWeight.w500,
+                  fontSize: 12,
+                ),
+                maxLines: 1,
                 overflow: TextOverflow.ellipsis,
               ),
-              
-              const SizedBox(height: 12),
-              
-              // Stats row
+            ),
+          ),
+          
+          const SizedBox(height: 12),
+          
+          // Description
+          ResponsiveText(
+            psychologist['description'],
+            style: Theme.of(context).textTheme.bodyMedium,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+          ),
+          
+          const SizedBox(height: 12),
+          
+          // Stats row
+          Row(
+            children: [
+              // Rating
               Row(
                 children: [
-                  // Rating
-                  Row(
-                    children: [
-                      Icon(
-                        Icons.star,
-                        size: 16,
-                        color: Colors.amber,
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        psychologist['rating'].toString(),
-                        style: const TextStyle(fontWeight: FontWeight.w500),
-                      ),
-                    ],
+                  ResponsiveIcon(
+                    Icons.star,
+                    size: 16,
+                    color: Colors.amber,
                   ),
-                  
-                  const SizedBox(width: 16),
-                  
-                  // Experience
-                  Row(
-                    children: [
-                      Icon(
-                        Icons.work_outline,
-                        size: 16,
-                        color: Theme.of(context).colorScheme.outline,
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        '${psychologist['experience']} ans',
-                        style: TextStyle(
-                          color: Theme.of(context).colorScheme.outline,
-                        ),
-                      ),
-                    ],
-                  ),
-                  
-                  const SizedBox(width: 16),
-                  
-                  // Availability
-                  Row(
-                    children: [
-                      Icon(
-                        Icons.schedule,
-                        size: 16,
-                        color: Theme.of(context).colorScheme.outline,
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        psychologist['availability'],
-                        style: TextStyle(
-                          color: Theme.of(context).colorScheme.outline,
-                        ),
-                      ),
-                    ],
+                  const SizedBox(width: 4),
+                  ResponsiveText(
+                    psychologist['rating'].toString(),
+                    style: const TextStyle(fontWeight: FontWeight.w500),
                   ),
                 ],
               ),
               
-              const SizedBox(height: 12),
+              const SizedBox(width: 16),
               
-              // Price and languages
+              // Experience
               Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text(
-                    '${psychologist['consultationPrice']}€/consultation',
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
-                      color: Theme.of(context).colorScheme.primary,
-                    ),
+                  ResponsiveIcon(
+                    Icons.work_outline,
+                    size: 16,
+                    color: Theme.of(context).colorScheme.outline,
                   ),
-                  
-                  // Languages
-                  Row(
-                    children: (psychologist['languages'] as List<String>).take(2).map((lang) {
-                      return Padding(
-                        padding: const EdgeInsets.only(left: 4),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: Colors.grey[200],
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Text(
-                            lang,
-                            style: const TextStyle(fontSize: 10),
-                          ),
-                        ),
-                      );
-                    }).toList(),
+                  const SizedBox(width: 4),
+                  ResponsiveText(
+                    '${psychologist['experience']} ans',
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.outline,
+                    ),
                   ),
                 ],
               ),
             ],
           ),
-        ),
+          
+          const SizedBox(height: 12),
+          
+          // Price and availability
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              ResponsiveText(
+                '${psychologist['consultationPrice']}€/consultation',
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: Theme.of(context).colorScheme.primary,
+                ),
+              ),
+              
+              // Availability
+              ResponsiveText(
+                psychologist['availability'],
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: Theme.of(context).colorScheme.outline,
+                ),
+              ),
+            ],
+          ),
+          
+          const SizedBox(height: 8),
+          
+          // Languages
+          Wrap(
+            spacing: 4,
+            runSpacing: 4,
+            children: (psychologist['languages'] as List<String>).take(2).map((lang) {
+              return Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: Colors.grey[200],
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: ResponsiveText(
+                  lang,
+                  style: const TextStyle(fontSize: 10),
+                ),
+              );
+            }).toList(),
+          ),
+        ],
       ),
     );
   }
