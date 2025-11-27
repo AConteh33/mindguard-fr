@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'dart:async';
 
 class ScreenTimeProvider with ChangeNotifier {
   Map<String, dynamic>? _screenTimeData;

@@ -11,7 +11,6 @@ import '../widgets/responsive/responsive_layout.dart';
 import '../widgets/responsive/responsive_text.dart';
 import '../widgets/responsive/responsive_container.dart';
 import '../services/screen_time_monitoring_service.dart';
-import '../services/app_blocking_service.dart';
 
 // Import your main tab screens
 import 'dashboard/dashboard_screen.dart';
@@ -40,7 +39,6 @@ class _MainTabScreenState extends State<MainTabScreen> {
   int _currentIndex = 0;
   late List<Widget> _screens;
   final ScreenTimeMonitoringService _screenTimeService = ScreenTimeMonitoringService();
-  final AppBlockingService _appBlockingService = AppBlockingService();
   bool _isMonitoringInitialized = false;
 
   @override
@@ -98,7 +96,6 @@ class _MainTabScreenState extends State<MainTabScreen> {
     // Stop screen time monitoring when app is closed
     if (_isMonitoringInitialized) {
       _screenTimeService.stopMonitoring();
-      _appBlockingService.stopBlocking();
     }
     super.dispose();
   }
@@ -124,21 +121,14 @@ class _MainTabScreenState extends State<MainTabScreen> {
         
         // Get parent ID (if linked)
         String? parentId;
-        final parentData = childrenProvider.parentData;
-        if (parentData != null) {
-          parentId = parentData['id'] as String?;
+        final parent = childrenProvider.parent;
+        if (parent != null) {
+          parentId = parent.uid;
         }
         
         if (parentId != null) {
           // Start screen time monitoring
           await _screenTimeService.startMonitoring(
-            childId: childId,
-            parentId: parentId,
-            parentalControlsProvider: parentalControlsProvider,
-          );
-          
-          // Start app blocking service
-          await _appBlockingService.startBlocking(
             childId: childId,
             parentId: parentId,
             parentalControlsProvider: parentalControlsProvider,

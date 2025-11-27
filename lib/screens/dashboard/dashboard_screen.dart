@@ -50,7 +50,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   void initState() {
     super.initState();
     // Load data when screen initializes
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
       final screenTimeProvider = Provider.of<ScreenTimeProvider>(context, listen: false);
       final moodProvider = Provider.of<MoodProvider>(context, listen: false);
       final appUsageProvider = Provider.of<AppUsageProvider>(context, listen: false);
@@ -72,7 +72,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           await childrenProvider.loadChildrenForParent(userId);
           final children = childrenProvider.children;
           if (children.isNotEmpty) {
-            final childrenIds = children.map((child) => child['id'] as String).toList();
+            final childrenIds = children.map((child) => child.childId).toList();
             await screenTimeProvider.startChildrenRealtimeListening(childrenIds);
           }
         }
