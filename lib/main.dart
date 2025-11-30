@@ -85,7 +85,7 @@ class MyApp extends StatelessWidget {
               themeProvider.setRole(authProvider.userModel!.role);
             }
           });
-          
+
           return ShadApp.router(
             routerConfig: appRouter,
             title: 'MindGuard FR',
@@ -111,7 +111,6 @@ class MyApp extends StatelessWidget {
             debugShowCheckedModeBanner: false,
           );
         }
-      ),
     );
   }
 }
