@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'dart:async';
 import '../providers/parental_controls_provider.dart';
 import '../services/parental_notification_service.dart';
@@ -11,6 +12,7 @@ class AppBlockingService {
   factory AppBlockingService() => _instance;
   AppBlockingService._internal();
 
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final ParentalNotificationService _notificationService = ParentalNotificationService();
   Timer? _blockingCheckTimer;
   bool _isBlockingActive = false;
@@ -18,10 +20,12 @@ class AppBlockingService {
   BuildContext? _appContext;
   String? _blockedAppName;
   String? _blockedReason;
+  String? _currentUserId;
 
   // Initialize app blocking
-  void initialize(BuildContext context) {
+  void initialize(BuildContext context, {String? userId}) {
     _appContext = context;
+    _currentUserId = userId;
     _startBlockingChecks();
   }
 
@@ -323,6 +327,26 @@ class _AppBlockingOverlayState extends State<_AppBlockingOverlay>
   }
 }
 
+Stream<Map<String, dynamic>> _getBlockingStatusStream() {
+  // Stream real-time blocking status from Firestore
+  final FirebaseFirestore firestore = FirebaseFirestore.instance;
+  return firestore
+      .collection('app_blocking_status')
+      .doc('current_user') // This should be replaced with actual user ID
+      .snapshots()
+      .map((snapshot) {
+        if (snapshot.exists) {
+          return snapshot.data() as Map<String, dynamic>;
+        }
+        return {
+          'blockedApps': <String>[],
+          'timeLimits': <String, dynamic>{},
+          'isBlockingActive': false,
+          'lastUpdated': DateTime.now(),
+        };
+      });
+}
+
 // Widget to show current blocking status
 class AppBlockingStatusWidget extends StatelessWidget {
   const AppBlockingStatusWidget({super.key});
@@ -388,15 +412,6 @@ class AppBlockingStatusWidget extends StatelessWidget {
         );
       },
     );
-  }
-
-  Stream<Map<String, dynamic>> _getBlockingStatusStream() {
-    // This would stream real-time blocking status
-    // For now, return a mock stream
-    return Stream.periodic(const Duration(seconds: 5), (_) {
-      final monitoringService = ScreenTimeMonitoringService();
-      return monitoringService.getCurrentUsageStats();
-    });
   }
 
   void _showBlockingInfo(BuildContext context) {

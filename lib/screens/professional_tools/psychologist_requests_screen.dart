@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:shadcn_ui/shadcn_ui.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../providers/auth_provider.dart';
 import '../../widgets/visual/animated_background_visual.dart';
 
@@ -12,64 +13,103 @@ class PsychologistRequestsScreen extends StatefulWidget {
 }
 
 class _PsychologistRequestsScreenState extends State<PsychologistRequestsScreen> {
-  // Mock data for consultation requests
-  List<Map<String, dynamic>> _requests = [
-    {
-      'id': 'req1',
-      'parentId': 'parent1',
-      'parentName': 'Marie Dupont',
-      'parentEmail': 'marie.dupont@email.com',
-      'childName': 'Thomas Dupont',
-      'childAge': 12,
-      'topic': 'Anxiété',
-      'urgency': 'Normal',
-      'format': 'Visioconférence',
-      'reason': 'Mon fils présente des signes d\'anxiété scolaire depuis le début de l\'année.',
-      'additionalInfo': 'Il a du mal à s\'endormir et se plaint de maux de ventre avant l\'école.',
-      'timeSlots': ['Mardi après-midi', 'Jeudi matin'],
-      'status': 'pending',
-      'createdAt': DateTime.now().subtract(const Duration(hours: 3)),
-      'consultationPrice': 80,
-    },
-    {
-      'id': 'req2',
-      'parentId': 'parent2',
-      'parentName': 'Jean Martin',
-      'parentEmail': 'jean.martin@email.com',
-      'childName': 'Sophie Martin',
-      'childAge': 15,
-      'topic': 'Dépression',
-      'urgency': 'Urgent',
-      'format': 'En cabinet',
-      'reason': 'Ma fille s\'est isolée socialement et montre peu d\'intérêt pour ses activités habituelles.',
-      'additionalInfo': 'Ses notes ont baissé et elle passe beaucoup de temps seule dans sa chambre.',
-      'timeSlots': ['Lundi matin', 'Mercredi après-midi', 'Vendredi matin'],
-      'status': 'pending',
-      'createdAt': DateTime.now().subtract(const Duration(hours: 6)),
-      'consultationPrice': 80,
-    },
-    {
-      'id': 'req3',
-      'parentId': 'parent3',
-      'parentName': 'Claire Bernard',
-      'parentEmail': 'claire.bernard@email.com',
-      'childName': 'Lucas Bernard',
-      'childAge': 8,
-      'topic': 'Troubles du sommeil',
-      'urgency': 'Normal',
-      'format': 'Visioconférence',
-      'reason': 'Mon fils a des difficultés à s\'endormir et fait fréquemment des cauchemars.',
-      'additionalInfo': '',
-      'timeSlots': ['Lundi après-midi', 'Mercredi matin'],
-      'status': 'approved',
-      'createdAt': DateTime.now().subtract(const Duration(days: 1)),
-      'consultationPrice': 80,
-      'approvedAt': DateTime.now().subtract(const Duration(hours: 12)),
-      'firstSessionDate': DateTime.now().add(const Duration(days: 3)),
-    },
-  ];
-
+  List<Map<String, dynamic>> _requests = [];
+  bool _isLoading = true;
   String _selectedStatus = 'Tous';
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadRequests();
+  }
+
+  Future<void> _loadRequests() async {
+    try {
+      setState(() {
+        _isLoading = true;
+      });
+
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      final psychologistId = authProvider.userModel?.uid;
+
+      if (psychologistId == null) {
+        setState(() {
+          _isLoading = false;
+        });
+        return;
+      }
+
+      // Load real consultation requests from Firestore
+      QuerySnapshot snapshot = await _firestore
+          .collection('consultation_requests')
+          .where('psychologistId', isEqualTo: psychologistId)
+          .where('status', whereIn: ['pending', 'accepted', 'rejected'])
+          .orderBy('createdAt', descending: true)
+          .get();
+
+      List<Map<String, dynamic>> requests = [];
+      
+      for (var doc in snapshot.docs) {
+        Map<String, dynamic> requestData = doc.data() as Map<String, dynamic>;
+        
+        // Get parent details
+        DocumentSnapshot parentDoc = await _firestore
+            .collection('users')
+            .doc(requestData['parentId'])
+            .get();
+        
+        if (parentDoc.exists) {
+          Map<String, dynamic> parentData = parentDoc.data() as Map<String, dynamic>;
+          
+          // Get child details
+          DocumentSnapshot childDoc = await _firestore
+              .collection('children')
+              .doc(requestData['childId'])
+              .get();
+          
+          if (childDoc.exists) {
+            Map<String, dynamic> childData = childDoc.data() as Map<String, dynamic>;
+            
+            requests.add({
+              'id': doc.id,
+              'parentId': requestData['parentId'],
+              'parentName': parentData['name'] ?? 'Parent inconnu',
+              'parentEmail': parentData['email'] ?? '',
+              'childName': childData['name'] ?? 'Enfant inconnu',
+              'childAge': childData['age'] ?? 0,
+              'topic': requestData['topic'] ?? '',
+              'urgency': requestData['urgency'] ?? 'Normal',
+              'format': requestData['format'] ?? 'Visioconférence',
+              'reason': requestData['reason'] ?? '',
+              'additionalInfo': requestData['additionalInfo'] ?? '',
+              'timeSlots': List<String>.from(requestData['timeSlots'] ?? []),
+              'status': requestData['status'],
+              'createdAt': (requestData['createdAt'] as Timestamp?)?.toDate(),
+              'consultationPrice': requestData['consultationPrice'] ?? 80,
+            });
+          }
+        }
+      }
+
+      setState(() {
+        _requests = requests;
+        _isLoading = false;
+      });
+    } catch (e) {
+      print('Error loading requests: $e');
+      setState(() {
+        _isLoading = false;
+      });
+    }
+  }
+
+  List<Map<String, dynamic>> get _filteredRequests {
+    if (_selectedStatus == 'Tous') {
+      return _requests;
+    }
+    return _requests.where((request) => request['status'] == _selectedStatus).toList();
+  }
 
   final List<String> _statusOptions = [
     'Tous',
@@ -92,7 +132,7 @@ class _PsychologistRequestsScreenState extends State<PsychologistRequestsScreen>
       );
     }
 
-    final filteredRequests = _getFilteredRequests();
+    final filteredRequests = _filteredRequests;
 
     return Scaffold(
       appBar: AppBar(

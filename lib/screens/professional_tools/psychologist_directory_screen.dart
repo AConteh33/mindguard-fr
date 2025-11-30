@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:shadcn_ui/shadcn_ui.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../providers/auth_provider.dart';
 import '../../utils/responsive_helper.dart';
 import '../../widgets/responsive/responsive_builder.dart';
@@ -26,59 +27,7 @@ class _PsychologistDirectoryScreenState extends State<PsychologistDirectoryScree
   List<Map<String, dynamic>> _filteredPsychologists = [];
   bool _isLoading = true;
   String _selectedSpecialty = 'Tous';
-
-  // Mock data for psychologists - in real app, this would come from Firestore
-  final List<Map<String, dynamic>> _mockPsychologists = [
-    {
-      'id': 'psych1',
-      'name': 'Dr. Marie Laurent',
-      'specialty': 'Enfants et Adolescents',
-      'experience': 15,
-      'rating': 4.8,
-      'languages': ['Français', 'Anglais'],
-      'availability': 'Lun-Ven',
-      'consultationPrice': 80,
-      'description': 'Spécialisée dans le développement enfantin et les troubles de l\'apprentissage.',
-      'photo': 'assets/psychologists/psych1.jpg',
-      'verified': true,
-    },
-    {
-      'id': 'psych2',
-      'name': 'Dr. Jean-Pierre Martin',
-      'specialty': 'Anxiété et Stress',
-      'experience': 12,
-      'rating': 4.9,
-      'languages': ['Français'],
-      'availability': 'Lun-Sam',
-      'consultationPrice': 75,
-      'description': 'Expert en gestion du stress et des troubles anxieux chez les jeunes.',
-      'photo': 'assets/psychologists/psych2.jpg',
-      'verified': true,
-    },
-    {
-      'id': 'psych3',
-      'name': 'Dr. Sophie Bernard',
-      'specialty': 'Développement Personnel',
-      'experience': 8,
-      'rating': 4.7,
-      'languages': ['Français', 'Espagnol'],
-      'availability': 'Mar-Mer',
-      'consultationPrice': 70,
-      'description': 'Accompagnement des jeunes dans leur développement personnel et scolaire.',
-      'photo': 'assets/psychologists/psych3.jpg',
-      'verified': false,
-    },
-  ];
-
-  final List<String> _specialties = [
-    'Tous',
-    'Enfants et Adolescents',
-    'Anxiété et Stress',
-    'Développement Personnel',
-    'Troubles de l\'apprentissage',
-    'Addiction',
-    'Dépression',
-  ];
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
   @override
   void initState() {
@@ -94,22 +43,44 @@ class _PsychologistDirectoryScreenState extends State<PsychologistDirectoryScree
   }
 
   Future<void> _loadPsychologists() async {
-    // Simulate loading delay
-    await Future.delayed(const Duration(seconds: 1));
-    
-    setState(() {
-      _psychologists = _mockPsychologists;
-      _filteredPsychologists = _mockPsychologists;
-      _isLoading = false;
-    });
+    try {
+      setState(() {
+        _isLoading = true;
+      });
+
+      // Load real psychologists from Firestore
+      QuerySnapshot snapshot = await _firestore
+          .collection('psychologists')
+          .where('isActive', isEqualTo: true)
+          .orderBy('rating', descending: true)
+          .get();
+
+      List<Map<String, dynamic>> psychologists = snapshot.docs.map((doc) {
+        Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
+        data['id'] = doc.id;
+        return data;
+      }).toList();
+
+      setState(() {
+        _psychologists = psychologists;
+        _filteredPsychologists = psychologists;
+        _isLoading = false;
+      });
+    } catch (e) {
+      print('Error loading psychologists: $e');
+      setState(() {
+        _isLoading = false;
+      });
+    }
   }
 
   void _filterPsychologists() {
-    final query = _searchController.text.toLowerCase();
+    String query = _searchController.text.toLowerCase();
+    
     setState(() {
       _filteredPsychologists = _psychologists.where((psychologist) {
-        final matchesSearch = psychologist['name'].toString().toLowerCase().contains(query) ||
-            psychologist['specialty'].toString().toLowerCase().contains(query);
+        final matchesSearch = psychologist['name']?.toString().toLowerCase().contains(query) == true ||
+            psychologist['specialty']?.toString().toLowerCase().contains(query) == true;
         final matchesSpecialty = _selectedSpecialty == 'Tous' ||
             psychologist['specialty'] == _selectedSpecialty;
         return matchesSearch && matchesSpecialty;
@@ -122,6 +93,16 @@ class _PsychologistDirectoryScreenState extends State<PsychologistDirectoryScree
       _selectedSpecialty = specialty;
     });
     _filterPsychologists();
+  }
+
+  List<String> get _specialties {
+    Set<String> specialties = {'Tous'};
+    for (var psychologist in _psychologists) {
+      if (psychologist['specialty'] != null) {
+        specialties.add(psychologist['specialty'].toString());
+      }
+    }
+    return specialties.toList();
   }
 
   @override

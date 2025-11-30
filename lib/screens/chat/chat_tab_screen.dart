@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/children_provider.dart';
 import '../../models/user_model.dart';
 import '../../utils/responsive_helper.dart';
-import '../../widgets/responsive/responsive_builder.dart';
 import '../../widgets/responsive/responsive_layout.dart';
+import '../../widgets/responsive/responsive_builder.dart';
 import '../../widgets/responsive/responsive_container.dart';
 import '../../widgets/responsive/responsive_grid.dart';
 import '../../widgets/responsive/responsive_card.dart';
@@ -18,74 +19,125 @@ import 'professional_chat_screen.dart';
 class ChatTabScreen extends StatelessWidget {
   const ChatTabScreen({super.key});
 
+  Future<List<UserModel>> _getChatUsers(BuildContext context) async {
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final childrenProvider = Provider.of<ChildrenProvider>(context, listen: false);
+    final userRole = authProvider.userModel?.role ?? '';
+    final userId = authProvider.userModel?.uid ?? '';
+
+    List<UserModel> users = [];
+
+    if (userRole == 'parent') {
+      // Parent can chat with their children's psychologists
+      final children = childrenProvider.children;
+      for (var child in children) {
+        // Get consultations for this child
+        QuerySnapshot consultationSnapshot = await FirebaseFirestore.instance
+            .collection('consultations')
+            .where('childId', isEqualTo: child.id)
+            .where('status', isEqualTo: 'active')
+            .get();
+
+        for (var consultationDoc in consultationSnapshot.docs) {
+          Map<String, dynamic> consultation = consultationDoc.data() as Map<String, dynamic>;
+          String psychologistId = consultation['psychologistId'];
+          
+          // Get psychologist details
+          DocumentSnapshot psychologistDoc = await FirebaseFirestore.instance
+              .collection('users')
+              .doc(psychologistId)
+              .get();
+          
+          if (psychologistDoc.exists) {
+            Map<String, dynamic> psychologistData = psychologistDoc.data() as Map<String, dynamic>;
+            users.add(UserModel(
+              uid: psychologistId,
+              email: psychologistData['email'] ?? '',
+              name: psychologistData['name'] ?? 'Psychologue',
+              role: 'psychologist',
+            ));
+          }
+        }
+      }
+    } else if (userRole == 'child' && childrenProvider.parent != null) {
+      // Child can chat with their parent
+      users = [childrenProvider.parent!];
+    } else if (userRole == 'psychologist') {
+      // Psychologist can chat with their clients
+      QuerySnapshot consultationSnapshot = await FirebaseFirestore.instance
+          .collection('consultations')
+          .where('psychologistId', isEqualTo: userId)
+          .where('status', whereIn: ['active', 'pending'])
+          .get();
+
+      for (var consultationDoc in consultationSnapshot.docs) {
+        Map<String, dynamic> consultation = consultationDoc.data() as Map<String, dynamic>;
+        String parentId = consultation['parentId'];
+        
+        // Get parent details
+        DocumentSnapshot parentDoc = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(parentId)
+            .get();
+        
+        if (parentDoc.exists) {
+          Map<String, dynamic> parentData = parentDoc.data() as Map<String, dynamic>;
+          users.add(UserModel(
+            uid: parentId,
+            email: parentData['email'] ?? '',
+            name: parentData['name'] ?? 'Parent',
+            role: 'parent',
+          ));
+        }
+      }
+    }
+
+    // Remove duplicates
+    users = users.fold([], (list, user) {
+      if (!list.any((u) => u.uid == user.uid)) {
+        list.add(user);
+      }
+      return list;
+    });
+
+    return users;
+  }
+
   @override
   Widget build(BuildContext context) {
     final authProvider = Provider.of<AuthProvider>(context);
     final childrenProvider = Provider.of<ChildrenProvider>(context);
     final userRole = authProvider.userModel?.role ?? 'child';
-    final currentUserId = authProvider.userModel?.uid ?? '';
 
-    // Get available chat partners based on user role
-    List<UserModel> chatUsers = [];
-    
-    if (userRole == 'parent') {
-      // Parent can chat with their children and psychologists
-      // Add children
-      if (childrenProvider.children.isNotEmpty) {
-        chatUsers.addAll(childrenProvider.children.map((child) => UserModel(
-          uid: child.childId,
-          name: child.childName,
-          role: 'child',
-        )));
-      }
-      
-      // Add mock psychologists (in real app, this would come from approved consultations)
-      final mockPsychologists = [
-        UserModel(
-          uid: 'psych1',
-          name: 'Dr. Marie Laurent',
-          role: 'psychologist',
-        ),
-        UserModel(
-          uid: 'psych2',
-          name: 'Dr. Jean-Pierre Martin',
-          role: 'psychologist',
-        ),
-      ];
-      chatUsers.addAll(mockPsychologists);
-      
-    } else if (userRole == 'child' && childrenProvider.parent != null) {
-      // Child can chat with their parent
-      chatUsers = [childrenProvider.parent!];
-    } else if (userRole == 'psychologist') {
-      // Psychologist can chat with their clients (mock data for now)
-      final mockClients = [
-        UserModel(
-          uid: 'parent1',
-          name: 'Marie Dupont',
-          role: 'parent',
-        ),
-        UserModel(
-          uid: 'parent2',
-          name: 'Jean Martin',
-          role: 'parent',
-        ),
-      ];
-      chatUsers = mockClients;
-    }
+    return FutureBuilder<List<UserModel>>(
+      future: _getChatUsers(context),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
 
-    if (chatUsers.isEmpty) {
-      return ResponsiveLayout(
-        mobile: _buildEmptyStateMobile(context, userRole),
-        tablet: _buildEmptyStateTablet(context, userRole),
-        desktop: _buildEmptyStateDesktop(context, userRole),
-      );
-    }
+        if (snapshot.hasError) {
+          return Center(
+            child: Text('Erreur: ${snapshot.error}'),
+          );
+        }
 
-    return ResponsiveLayout(
-      mobile: _buildMobileChatList(context, chatUsers),
-      tablet: _buildTabletChatList(context, chatUsers),
-      desktop: _buildDesktopChatList(context, chatUsers),
+        final chatUsers = snapshot.data ?? [];
+
+        if (chatUsers.isEmpty) {
+          return ResponsiveLayout(
+            mobile: _buildEmptyStateMobile(context, userRole),
+            tablet: _buildEmptyStateTablet(context, userRole),
+            desktop: _buildEmptyStateDesktop(context, userRole),
+          );
+        }
+
+        return ResponsiveLayout(
+          mobile: _buildMobileChatList(context, chatUsers),
+          tablet: _buildTabletChatList(context, chatUsers),
+          desktop: _buildDesktopChatList(context, chatUsers),
+        );
+      },
     );
   }
 

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:shadcn_ui/shadcn_ui.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../providers/auth_provider.dart';
 import '../../widgets/visual/animated_background_visual.dart';
 import 'professional_chat_screen.dart';
@@ -18,83 +19,7 @@ class _ClientManagementScreenState extends State<ClientManagementScreen> {
   List<Map<String, dynamic>> _filteredClients = [];
   bool _isLoading = true;
   String _selectedStatus = 'Tous';
-
-  // Mock data for clients
-  final List<Map<String, dynamic>> _mockClients = [
-    {
-      'id': 'client1',
-      'parentId': 'parent1',
-      'parentName': 'Marie Dupont',
-      'parentEmail': 'marie.dupont@email.com',
-      'parentPhone': '+33 6 12 34 56 78',
-      'childName': 'Thomas Dupont',
-      'childAge': 12,
-      'childGender': 'Garçon',
-      'consultationReason': 'Anxiété scolaire',
-      'status': 'active',
-      'startDate': DateTime.now().subtract(const Duration(days: 30)),
-      'lastSession': DateTime.now().subtract(const Duration(days: 3)),
-      'nextSession': DateTime.now().add(const Duration(days: 4)),
-      'totalSessions': 8,
-      'upcomingSessions': 2,
-      'notes': 'Thomas montre des signes d\'amélioration. Continuez avec les techniques de relaxation.',
-      'emergencyContact': '+33 6 98 76 54 32',
-      'address': '123 Rue de la Paix, 75001 Paris',
-      'consultationType': 'Visioconférence',
-      'paymentStatus': 'paid',
-    },
-    {
-      'id': 'client2',
-      'parentId': 'parent2',
-      'parentName': 'Jean Martin',
-      'parentEmail': 'jean.martin@email.com',
-      'parentPhone': '+33 6 23 45 67 89',
-      'childName': 'Sophie Martin',
-      'childAge': 15,
-      'childGender': 'Fille',
-      'consultationReason': 'Dépression adolescente',
-      'status': 'active',
-      'startDate': DateTime.now().subtract(const Duration(days: 15)),
-      'lastSession': DateTime.now().subtract(const Duration(days: 7)),
-      'nextSession': DateTime.now().add(const Duration(days: 2)),
-      'totalSessions': 4,
-      'upcomingSessions': 3,
-      'notes': 'Sophie est plus ouverte à la communication. Explorer les relations sociales.',
-      'emergencyContact': '+33 6 87 65 43 21',
-      'address': '456 Avenue des Champs-Élysées, 75008 Paris',
-      'consultationType': 'En cabinet',
-      'paymentStatus': 'pending',
-    },
-    {
-      'id': 'client3',
-      'parentId': 'parent3',
-      'parentName': 'Claire Bernard',
-      'parentEmail': 'claire.bernard@email.com',
-      'parentPhone': '+33 6 34 56 78 90',
-      'childName': 'Lucas Bernard',
-      'childAge': 8,
-      'childGender': 'Garçon',
-      'consultationReason': 'Troubles du sommeil',
-      'status': 'inactive',
-      'startDate': DateTime.now().subtract(const Duration(days: 90)),
-      'lastSession': DateTime.now().subtract(const Duration(days: 30)),
-      'nextSession': null,
-      'totalSessions': 12,
-      'upcomingSessions': 0,
-      'notes': 'Lucas a montré une amélioration significative. Parents satisfaits.',
-      'emergencyContact': '+33 6 76 54 32 10',
-      'address': '789 Boulevard Saint-Germain, 75006 Paris',
-      'consultationType': 'Visioconférence',
-      'paymentStatus': 'paid',
-    },
-  ];
-
-  final List<String> _statusOptions = [
-    'Tous',
-    'Actifs',
-    'Inactifs',
-    'Nouveaux',
-  ];
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
   @override
   void initState() {
@@ -110,40 +35,106 @@ class _ClientManagementScreenState extends State<ClientManagementScreen> {
   }
 
   Future<void> _loadClients() async {
-    // Simulate loading delay
-    await Future.delayed(const Duration(seconds: 1));
-    
-    setState(() {
-      _clients = _mockClients;
-      _filteredClients = _mockClients;
-      _isLoading = false;
-    });
+    try {
+      setState(() {
+        _isLoading = true;
+      });
+
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      final psychologistId = authProvider.userModel?.uid;
+
+      if (psychologistId == null) {
+        setState(() {
+          _isLoading = false;
+        });
+        return;
+      }
+
+      // Load real clients from Firestore - clients assigned to this psychologist
+      QuerySnapshot snapshot = await _firestore
+          .collection('consultations')
+          .where('psychologistId', isEqualTo: psychologistId)
+          .where('status', whereIn: ['active', 'pending', 'completed'])
+          .orderBy('createdAt', descending: true)
+          .get();
+
+      List<Map<String, dynamic>> clients = [];
+      
+      for (var doc in snapshot.docs) {
+        Map<String, dynamic> consultation = doc.data() as Map<String, dynamic>;
+        
+        // Get parent details
+        DocumentSnapshot parentDoc = await _firestore
+            .collection('users')
+            .doc(consultation['parentId'])
+            .get();
+        
+        if (parentDoc.exists) {
+          Map<String, dynamic> parentData = parentDoc.data() as Map<String, dynamic>;
+          
+          // Get child details
+          DocumentSnapshot childDoc = await _firestore
+              .collection('children')
+              .doc(consultation['childId'])
+              .get();
+          
+          if (childDoc.exists) {
+            Map<String, dynamic> childData = childDoc.data() as Map<String, dynamic>;
+            
+            clients.add({
+              'id': doc.id,
+              'consultationId': doc.id,
+              'parentId': consultation['parentId'],
+              'parentName': parentData['name'] ?? 'Parent inconnu',
+              'parentEmail': parentData['email'] ?? '',
+              'parentPhone': parentData['phone'] ?? '',
+              'childName': childData['name'] ?? 'Enfant inconnu',
+              'childAge': childData['age'] ?? 0,
+              'childGender': childData['gender'] ?? '',
+              'consultationReason': consultation['reason'] ?? '',
+              'status': consultation['status'],
+              'startDate': (consultation['createdAt'] as Timestamp?)?.toDate(),
+              'lastSession': (consultation['lastSession'] as Timestamp?)?.toDate(),
+              'nextSession': (consultation['nextSession'] as Timestamp?)?.toDate(),
+              'totalSessions': consultation['totalSessions'] ?? 0,
+              'upcomingSessions': consultation['upcomingSessions'] ?? 0,
+              'notes': consultation['notes'] ?? '',
+              'emergencyContact': parentData['phone'] ?? '',
+              'address': parentData['address'] ?? '',
+              'consultationType': consultation['consultationType'] ?? 'Visioconférence',
+              'paymentStatus': consultation['paymentStatus'] ?? 'pending',
+            });
+          }
+        }
+      }
+
+      setState(() {
+        _clients = clients;
+        _filteredClients = clients;
+        _isLoading = false;
+      });
+    } catch (e) {
+      print('Error loading clients: $e');
+      setState(() {
+        _isLoading = false;
+      });
+    }
   }
 
   void _filterClients() {
-    final query = _searchController.text.toLowerCase();
+    String query = _searchController.text.toLowerCase();
+    
     setState(() {
       _filteredClients = _clients.where((client) {
-        final matchesSearch = client['parentName'].toString().toLowerCase().contains(query) ||
-            client['childName'].toString().toLowerCase().contains(query) ||
-            client['consultationReason'].toString().toLowerCase().contains(query);
-        final matchesStatus = _selectedStatus == 'Tous' || _getStatusFilter(client['status']) == _selectedStatus;
+        final matchesSearch = 
+            client['parentName']?.toString().toLowerCase().contains(query) == true ||
+            client['childName']?.toString().toLowerCase().contains(query) == true ||
+            client['consultationReason']?.toString().toLowerCase().contains(query) == true;
+        final matchesStatus = _selectedStatus == 'Tous' ||
+            client['status'] == _selectedStatus;
         return matchesSearch && matchesStatus;
       }).toList();
     });
-  }
-
-  String _getStatusFilter(String status) {
-    switch (status) {
-      case 'active':
-        return 'Actifs';
-      case 'inactive':
-        return 'Inactifs';
-      case 'new':
-        return 'Nouveaux';
-      default:
-        return 'Tous';
-    }
   }
 
   void _onStatusChanged(String status) {
@@ -151,6 +142,20 @@ class _ClientManagementScreenState extends State<ClientManagementScreen> {
       _selectedStatus = status;
     });
     _filterClients();
+  }
+
+  List<String> get _statusOptions {
+    Set<String> statuses = {'Tous'};
+    for (var client in _clients) {
+      if (client['status'] != null) {
+        String status = client['status'].toString();
+        if (status == 'active') statuses.add('Actifs');
+        else if (status == 'inactive') statuses.add('Inactifs');
+        else if (status == 'pending') statuses.add('Nouveaux');
+        else statuses.add(status);
+      }
+    }
+    return statuses.toList();
   }
 
   @override

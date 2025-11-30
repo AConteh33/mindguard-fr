@@ -262,10 +262,6 @@ class _ParentalControlsScreenState extends State<ParentalControlsScreen> {
               ),
               const SizedBox(height: 24),
 
-              // Device tracking status card
-              _buildChildTrackingCard(),
-              const SizedBox(height: 24),
-
               // Child Selection
               if (childrenProvider.children.isNotEmpty) ...[
                 ShadCard(
@@ -304,11 +300,11 @@ class _ParentalControlsScreenState extends State<ParentalControlsScreen> {
 
                 // Control form (only show when child is selected)
                 if (_selectedChildId != null && _selectedChildId!.isNotEmpty) ...[
-                Form(
-                  key: _formKey,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
+                  Form(
+                    key: _formKey,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
                       // Daily Limit
                       ShadCard(
                         child: Padding(
@@ -672,75 +668,14 @@ class _ParentalControlsScreenState extends State<ParentalControlsScreen> {
                   ),
                 ),
               ],
+              ],
+              
+              // Device tracking status card
+              _buildChildTrackingCard(),
             ],
           ),
         ),
       ),
-    );
-  }
-}
-
-class AddTimeRangeDialog extends StatefulWidget {
-  final Function(String startTime, String endTime) onAdd;
-
-  const AddTimeRangeDialog({super.key, required this.onAdd});
-
-  @override
-  State<AddTimeRangeDialog> createState() => _AddTimeRangeDialogState();
-}
-
-class _AddTimeRangeDialogState extends State<AddTimeRangeDialog> {
-  final _startTimeController = TextEditingController();
-  final _endTimeController = TextEditingController();
-
-  @override
-  void dispose() {
-    _startTimeController.dispose();
-    _endTimeController.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AlertDialog(
-      title: const Text('Ajouter une plage horaire'),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          TextFormField(
-            controller: _startTimeController,
-            decoration: const InputDecoration(
-              labelText: 'Heure de début',
-              hintText: '08:00',
-            ),
-            keyboardType: TextInputType.datetime,
-          ),
-          const SizedBox(height: 16),
-          TextFormField(
-            controller: _endTimeController,
-            decoration: const InputDecoration(
-              labelText: 'Heure de fin',
-              hintText: '20:00',
-            ),
-            keyboardType: TextInputType.datetime,
-          ),
-        ],
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Annuler'),
-        ),
-        TextButton(
-          onPressed: () {
-            if (_startTimeController.text.isNotEmpty && _endTimeController.text.isNotEmpty) {
-              widget.onAdd(_startTimeController.text, _endTimeController.text);
-              Navigator.of(context).pop();
-            }
-          },
-          child: const Text('Ajouter'),
-        ),
-      ],
     );
   }
 
@@ -860,6 +795,71 @@ class _AddTimeRangeDialogState extends State<AddTimeRangeDialog> {
           ),
         ],
       ),
+    );
+  }
+}
+
+class AddTimeRangeDialog extends StatefulWidget {
+  final Function(String startTime, String endTime) onAdd;
+
+  const AddTimeRangeDialog({super.key, required this.onAdd});
+
+  @override
+  State<AddTimeRangeDialog> createState() => _AddTimeRangeDialogState();
+}
+
+class _AddTimeRangeDialogState extends State<AddTimeRangeDialog> {
+  final _startTimeController = TextEditingController();
+  final _endTimeController = TextEditingController();
+
+  @override
+  void dispose() {
+    _startTimeController.dispose();
+    _endTimeController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Ajouter une plage horaire'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          TextFormField(
+            controller: _startTimeController,
+            decoration: const InputDecoration(
+              labelText: 'Heure de début',
+              hintText: '08:00',
+            ),
+            keyboardType: TextInputType.datetime,
+          ),
+          const SizedBox(height: 16),
+          TextFormField(
+            controller: _endTimeController,
+            decoration: const InputDecoration(
+              labelText: 'Heure de fin',
+              hintText: '20:00',
+            ),
+            keyboardType: TextInputType.datetime,
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Annuler'),
+        ),
+        TextButton(
+          onPressed: () {
+            if (_startTimeController.text.isNotEmpty && _endTimeController.text.isNotEmpty) {
+              widget.onAdd(_startTimeController.text, _endTimeController.text);
+              Navigator.of(context).pop();
+            }
+          },
+          child: const Text('Ajouter'),
+        ),
+      ],
     );
   }
 }

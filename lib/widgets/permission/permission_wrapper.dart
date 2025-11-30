@@ -98,7 +98,7 @@ class PermissionRequestCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final info = PermissionManager._permissionInfo[permission];
+    final info = PermissionManager.permissionInfo[permission];
     
     return Container(
       margin: const EdgeInsets.all(16),
@@ -308,7 +308,7 @@ class MultiPermissionRequestCard extends StatelessWidget {
           ),
           const SizedBox(height: 16),
           ...permissions.map((permission) {
-            final info = PermissionManager._permissionInfo[permission];
+            final info = PermissionManager.permissionInfo[permission];
             if (info == null) return const SizedBox.shrink();
             
             return Padding(
