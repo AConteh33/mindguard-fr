@@ -62,9 +62,14 @@ class MoodProvider with ChangeNotifier {
 
   // Calculate mood statistics
   double get averageMood {
-    if (_moodEntries.isEmpty) return 0.0;
+    if (_moodEntries.isEmpty) {
+      if (kDebugMode) print('No mood entries available for average calculation');
+      return 0.0;
+    }
     final sum = _moodEntries.fold(0, (prev, entry) => prev + (entry['moodValue'] as int));
-    return sum / _moodEntries.length;
+    final average = sum / _moodEntries.length;
+    if (kDebugMode) print('Average mood: ${average.toStringAsFixed(1)} from ${_moodEntries.length} entries');
+    return average;
   }
 
   int get positiveMoodCount {

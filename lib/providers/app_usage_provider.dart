@@ -9,8 +9,12 @@ class AppUsageProvider with ChangeNotifier {
   String? _lastError;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
-  List<Map<String, dynamic>> get appUsageData => _appUsageData;
-  bool get isLoading => _isLoading;
+  List<Map<String, dynamic>> get appUsageData {
+  if (kDebugMode) print('App usage data count: ${_appUsageData.length}');
+  return _appUsageData;
+}
+
+bool get isLoading => _isLoading;
   bool get hasNativeTracking => _hasNativeTracking;
   String? get lastError => _lastError;
 

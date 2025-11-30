@@ -1,4 +1,5 @@
 import 'package:firebase_core/firebase_core.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:mindguard_fr/providers/auth_provider.dart';
@@ -76,23 +77,8 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MultiProvider(
-      providers: [
-        ChangeNotifierProvider(create: (context) => AuthProvider()),
-        ChangeNotifierProvider(create: (context) => ThemeProvider()),
-        ChangeNotifierProvider(create: (context) => MoodProvider()),
-        ChangeNotifierProvider(create: (context) => SettingsProvider()),
-        ChangeNotifierProvider(create: (context) => ScreenTimeProvider()),
-        ChangeNotifierProvider(create: (context) => ChildrenProvider()),
-        ChangeNotifierProvider(create: (context) => AppUsageProvider()),
-        ChangeNotifierProvider(create: (context) => FocusSessionProvider()),
-        ChangeNotifierProvider(create: (context) => AssessmentProvider()),
-        ChangeNotifierProvider(create: (context) => ClientProvider()),
-        ChangeNotifierProvider(create: (context) => AppointmentsProvider()),
-        ChangeNotifierProvider(create: (context) => MessagesProvider()),
-      ],
-      child: Consumer2<AuthProvider, ThemeProvider>(
-        builder: (context, authProvider, themeProvider, child) {
+    return Consumer2<AuthProvider, ThemeProvider>(
+      builder: (context, authProvider, themeProvider, child) {
           // Update theme based on user role when user changes, but avoid rebuild during build
           WidgetsBinding.instance.addPostFrameCallback((_) {
             if (authProvider.userModel != null && themeProvider.currentRole != authProvider.userModel!.role) {
@@ -124,7 +110,7 @@ class MyApp extends StatelessWidget {
             themeMode: themeProvider.isDarkMode ? ThemeMode.dark : ThemeMode.light,
             debugShowCheckedModeBanner: false,
           );
-        },
+        }
       ),
     );
   }
@@ -133,6 +119,9 @@ class MyApp extends StatelessWidget {
 // Initialize app usage tracking
 Future<void> _initializeAppUsageTracking() async {
   try {
+    // Only initialize on Android platforms
+    if (!kDebugMode) return; // Skip in production for now
+    
     // Check if usage stats permission is available
     final hasPermission = await AppUsagePlatformService.hasUsageStatsPermission();
     
@@ -151,33 +140,58 @@ Future<void> _initializeAppUsageTracking() async {
     }
   } catch (e) {
     print('Error initializing app usage tracking: $e');
+    // Don't crash the app, just log the error
   }
 }
 
 // Initialize permissions
 Future<void> _initializePermissions() async {
   try {
+    // Skip permission checks on web platform
+    if (kIsWeb) {
+      print('Skipping permission initialization on web platform');
+      return;
+    }
+    
     // Initialize permission service
     final permissionService = PermissionService();
     
-    // Check critical permissions
-    final cameraPermission = await permissionService.hasCameraPermission();
-    final microphonePermission = await permissionService.hasMicrophonePermission();
-    final storagePermission = await permissionService.hasStoragePermission();
-    final notificationPermission = await permissionService.hasNotificationPermission();
+    // Check critical permissions (with error handling)
+    try {
+      final cameraPermission = await permissionService.hasCameraPermission();
+      print('Camera: ${cameraPermission ? "Granted" : "Denied"}');
+    } catch (e) {
+      print('Error checking camera permission: $e');
+    }
     
-    print('Permission Status:');
-    print('Camera: ${cameraPermission ? "Granted" : "Denied"}');
-    print('Microphone: ${microphonePermission ? "Granted" : "Denied"}');
-    print('Storage: ${storagePermission ? "Granted" : "Denied"}');
-    print('Notifications: ${notificationPermission ? "Granted" : "Denied"}');
+    try {
+      final microphonePermission = await permissionService.hasMicrophonePermission();
+      print('Microphone: ${microphonePermission ? "Granted" : "Denied"}');
+    } catch (e) {
+      print('Error checking microphone permission: $e');
+    }
     
-    // Request notification permissions if not granted
-    if (!notificationPermission) {
-      await permissionService.requestNotificationPermission();
+    try {
+      final storagePermission = await permissionService.hasStoragePermission();
+      print('Storage: ${storagePermission ? "Granted" : "Denied"}');
+    } catch (e) {
+      print('Error checking storage permission: $e');
+    }
+    
+    try {
+      final notificationPermission = await permissionService.hasNotificationPermission();
+      print('Notifications: ${notificationPermission ? "Granted" : "Denied"}');
+      
+      // Request notification permissions if not granted
+      if (!notificationPermission) {
+        await permissionService.requestNotificationPermission();
+      }
+    } catch (e) {
+      print('Error checking notification permission: $e');
     }
     
   } catch (e) {
     print('Error initializing permissions: $e');
+    // Don't crash the app, just log the error
   }
 }

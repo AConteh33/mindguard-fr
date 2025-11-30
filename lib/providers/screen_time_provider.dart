@@ -241,29 +241,57 @@ class ScreenTimeProvider with ChangeNotifier {
 
   // Get today's screen time
   String getTodayScreenTime() {
-    if (_screenTimeData == null) return '0h 0m';
+    if (_screenTimeData == null) {
+      if (kDebugMode) print('Screen time data is null');
+      return '0h 0m';
+    }
     
     final dailyData = _screenTimeData!['daily'] as Map<String, dynamic>?;
-    if (dailyData == null) return '0h 0m';
+    if (dailyData == null) {
+      if (kDebugMode) print('Daily data is null');
+      return '0h 0m';
+    }
     
-    final today = DateTime.now().toString().split(' ')[0];
-    final todayData = dailyData[today] as Map<String, dynamic>?;
+    // Try multiple date formats
+    final now = DateTime.now();
+    final dateFormats = [
+      now.toString().split(' ')[0], // YYYY-MM-DD
+      '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}', // YYYY-MM-DD padded
+      now.toIso8601String().split('T')[0], // ISO format
+    ];
     
-    if (todayData == null) return '0h 0m';
+    Map<String, dynamic>? todayData;
+    for (final format in dateFormats) {
+      todayData = dailyData[format] as Map<String, dynamic>?;
+      if (todayData != null) break;
+    }
     
-    final minutes = todayData['minutes'] as int? ?? 0;
+    if (todayData == null) {
+      if (kDebugMode) print('No data found for today. Available dates: ${dailyData.keys.toList()}');
+      return '0h 0m';
+    }
+    
+    final minutes = todayData['minutes'] as int? ?? todayData['totalMinutes'] as int? ?? 0;
     final hours = (minutes ~/ 60);
     final remainingMinutes = minutes % 60;
+    
+    if (kDebugMode) print('Today screen time: ${hours}h ${remainingMinutes}m (${minutes} minutes)');
     
     return '${hours}h ${remainingMinutes}m';
   }
 
   // Get weekly average screen time
   double getWeeklyAverage() {
-    if (_screenTimeData == null) return 0.0;
+    if (_screenTimeData == null) {
+      if (kDebugMode) print('Screen time data is null for weekly average');
+      return 0.0;
+    }
     
     final dailyData = _screenTimeData!['daily'] as Map<String, dynamic>?;
-    if (dailyData == null) return 0.0;
+    if (dailyData == null) {
+      if (kDebugMode) print('Daily data is null for weekly average');
+      return 0.0;
+    }
     
     int totalMinutes = 0;
     int dayCount = 0;
@@ -271,13 +299,16 @@ class ScreenTimeProvider with ChangeNotifier {
     for (final entry in dailyData.entries) {
       final dayData = entry.value as Map<String, dynamic>?;
       if (dayData != null) {
-        final minutes = dayData['minutes'] as int? ?? 0;
+        final minutes = dayData['minutes'] as int? ?? dayData['totalMinutes'] as int? ?? 0;
         totalMinutes += minutes;
         dayCount++;
       }
     }
     
-    return dayCount > 0 ? (totalMinutes / dayCount) / 60.0 : 0.0; // Return in hours
+    final averageHours = dayCount > 0 ? (totalMinutes / dayCount) / 60.0 : 0.0;
+    if (kDebugMode) print('Weekly average: ${averageHours.toStringAsFixed(1)}h (${dayCount} days, ${totalMinutes} total minutes)');
+    
+    return averageHours;
   }
 
   // Get most used app
