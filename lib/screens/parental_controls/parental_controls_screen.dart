@@ -4,6 +4,8 @@ import 'package:shadcn_ui/shadcn_ui.dart';
 import '../../providers/parental_controls_provider.dart';
 import '../../providers/children_provider.dart';
 import '../../providers/auth_provider.dart';
+import '../../providers/app_usage_provider.dart';
+import '../../services/app_usage_platform_service.dart';
 import '../../models/parental_control_models.dart';
 import '../../widgets/visual/enhanced_stat_card.dart';
 import '../../widgets/visual/animated_background_visual.dart';
@@ -24,22 +26,8 @@ class _ParentalControlsScreenState extends State<ParentalControlsScreen> {
   final List<String> _blockedApps = [];
   final List<String> _allowedTimeRanges = [];
   bool _notificationsEnabled = true;
-  
-  // Mock app list - in real app, this would come from device usage data
-  final List<String> _availableApps = [
-    'Instagram',
-    'TikTok',
-    'YouTube',
-    'WhatsApp',
-    'Facebook',
-    'Snapchat',
-    'Twitter',
-    'Netflix',
-    'Spotify',
-    'Games',
-    'Messages',
-    'Phone',
-  ];
+  List<String> _availableApps = [];
+  bool _isLoadingApps = false;
 
   @override
   void initState() {
@@ -62,18 +50,58 @@ class _ParentalControlsScreenState extends State<ParentalControlsScreen> {
   Future<void> _loadData() async {
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
     final childrenProvider = Provider.of<ChildrenProvider>(context, listen: false);
+    final appUsageProvider = Provider.of<AppUsageProvider>(context, listen: false);
     
     if (authProvider.userModel?.role == 'parent') {
       await childrenProvider.loadChildren(authProvider.userModel!.uid);
+      
+      // Load real app usage data for the first child to get available apps
+      final children = childrenProvider.children;
+      if (children.isNotEmpty) {
+        setState(() {
+          _isLoadingApps = true;
+        });
+        
+        await appUsageProvider.loadAppUsageData(children.first.childId, daysBack: 7);
+        
+        // Get real app names from usage data
+        final topApps = appUsageProvider.getTopAppsByUsage(limit: 20);
+        setState(() {
+          _availableApps = topApps
+              .map((app) => app['appName'] as String? ?? '')
+              .where((name) => name.isNotEmpty)
+              .toList();
+          _isLoadingApps = false;
+        });
+      }
     }
   }
 
-  void _onChildSelected(String childId) {
+  void _onChildSelected(String childId) async {
     setState(() {
       _selectedChildId = childId;
     });
     
     if (childId.isNotEmpty) {
+      // Load real app usage data for the selected child
+      final appUsageProvider = Provider.of<AppUsageProvider>(context, listen: false);
+      
+      setState(() {
+        _isLoadingApps = true;
+      });
+      
+      await appUsageProvider.loadAppUsageData(childId, daysBack: 7);
+      
+      // Update available apps based on real usage data
+      final topApps = appUsageProvider.getTopAppsByUsage(limit: 20);
+      setState(() {
+        _availableApps = topApps
+            .map((app) => app['appName'] as String? ?? '')
+            .where((name) => name.isNotEmpty)
+            .toList();
+        _isLoadingApps = false;
+      });
+      
       _loadChildControls(childId);
     }
   }
@@ -234,6 +262,10 @@ class _ParentalControlsScreenState extends State<ParentalControlsScreen> {
               ),
               const SizedBox(height: 24),
 
+              // Device tracking status card
+              _buildChildTrackingCard(),
+              const SizedBox(height: 24),
+
               // Child Selection
               if (childrenProvider.children.isNotEmpty) ...[
                 ShadCard(
@@ -269,10 +301,9 @@ class _ParentalControlsScreenState extends State<ParentalControlsScreen> {
                   ),
                 ),
                 const SizedBox(height: 24),
-              ],
 
-              // Controls Form
-              if (_selectedChildId != null) ...[
+                // Control form (only show when child is selected)
+                if (_selectedChildId != null && _selectedChildId!.isNotEmpty) ...[
                 Form(
                   key: _formKey,
                   child: Column(
@@ -370,20 +401,68 @@ class _ParentalControlsScreenState extends State<ParentalControlsScreen> {
                               Wrap(
                                 spacing: 8,
                                 runSpacing: 8,
-                                children: _availableApps.map((app) {
-                                  final hasLimit = _appLimitControllers.containsKey(app);
-                                  return FilterChip(
-                                    label: Text(app),
-                                    selected: hasLimit,
-                                    onSelected: (selected) {
-                                      if (selected) {
-                                        _addAppLimit(app);
-                                      } else {
-                                        _removeAppLimit(app);
-                                      }
-                                    },
-                                  );
-                                }).toList(),
+                                children: _isLoadingApps 
+                                    ? [
+                                        Container(
+                                          padding: const EdgeInsets.all(16),
+                                          child: Column(
+                                            children: [
+                                              CircularProgressIndicator(),
+                                              const SizedBox(height: 8),
+                                              Text(
+                                                'Chargement des applications...',
+                                                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                                  color: Theme.of(context).colorScheme.outline,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ]
+                                    : _availableApps.isEmpty 
+                                        ? [
+                                            Container(
+                                              padding: const EdgeInsets.all(16),
+                                              child: Column(
+                                                children: [
+                                                  Icon(
+                                                    Icons.phone_android_outlined,
+                                                    size: 32,
+                                                    color: Theme.of(context).colorScheme.outline,
+                                                  ),
+                                                  const SizedBox(height: 8),
+                                                  Text(
+                                                    'Aucune application détectée',
+                                                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                                      color: Theme.of(context).colorScheme.outline,
+                                                    ),
+                                                  ),
+                                                  const SizedBox(height: 4),
+                                                  Text(
+                                                    'Les données d\'utilisation apparaîtront ici une fois que l\'enfant commencera à utiliser des applications.',
+                                                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                                      color: Theme.of(context).colorScheme.outline,
+                                                    ),
+                                                    textAlign: TextAlign.center,
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                          ]
+                                        : _availableApps.map((app) {
+                                            final hasLimit = _appLimitControllers.containsKey(app);
+                                            return FilterChip(
+                                              label: Text(app),
+                                              selected: hasLimit,
+                                              onSelected: (selected) {
+                                                if (selected) {
+                                                  _addAppLimit(app);
+                                                } else {
+                                                  _removeAppLimit(app);
+                                                }
+                                              },
+                                            );
+                                          }).toList(),
                               ),
                               const SizedBox(height: 12),
                               // App limit inputs
@@ -435,18 +514,66 @@ class _ParentalControlsScreenState extends State<ParentalControlsScreen> {
                               Wrap(
                                 spacing: 8,
                                 runSpacing: 8,
-                                children: _availableApps.map((app) {
-                                  final isBlocked = _blockedApps.contains(app);
-                                  return FilterChip(
-                                    label: Text(app),
-                                    selected: isBlocked,
-                                    selectedColor: Colors.red.withOpacity(0.2),
-                                    checkmarkColor: Colors.red,
-                                    onSelected: (selected) {
-                                      _toggleBlockedApp(app);
-                                    },
-                                  );
-                                }).toList(),
+                                children: _isLoadingApps 
+                                    ? [
+                                        Container(
+                                          padding: const EdgeInsets.all(16),
+                                          child: Column(
+                                            children: [
+                                              CircularProgressIndicator(),
+                                              const SizedBox(height: 8),
+                                              Text(
+                                                'Chargement des applications...',
+                                                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                                  color: Theme.of(context).colorScheme.outline,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ]
+                                    : _availableApps.isEmpty 
+                                        ? [
+                                            Container(
+                                              padding: const EdgeInsets.all(16),
+                                              child: Column(
+                                                children: [
+                                                  Icon(
+                                                    Icons.block_outlined,
+                                                    size: 32,
+                                                    color: Theme.of(context).colorScheme.outline,
+                                                  ),
+                                                  const SizedBox(height: 8),
+                                                  Text(
+                                                    'Aucune application à bloquer',
+                                                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                                      color: Theme.of(context).colorScheme.outline,
+                                                    ),
+                                                  ),
+                                                  const SizedBox(height: 4),
+                                                  Text(
+                                                    'Les applications utilisées par l\'enfant apparaîtront ici une fois les données de usage collectées.',
+                                                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                                      color: Theme.of(context).colorScheme.outline,
+                                                    ),
+                                                    textAlign: TextAlign.center,
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                          ]
+                                        : _availableApps.map((app) {
+                                            final isBlocked = _blockedApps.contains(app);
+                                            return FilterChip(
+                                              label: Text(app),
+                                              selected: isBlocked,
+                                              selectedColor: Colors.red.withOpacity(0.2),
+                                              checkmarkColor: Colors.red,
+                                              onSelected: (selected) {
+                                                _toggleBlockedApp(app);
+                                              },
+                                            );
+                                          }).toList(),
                               ),
                             ],
                           ),
@@ -614,6 +741,125 @@ class _AddTimeRangeDialogState extends State<AddTimeRangeDialog> {
           child: const Text('Ajouter'),
         ),
       ],
+    );
+  }
+
+  Widget _buildChildTrackingCard() {
+    return ShadCard(
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.blue.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Icon(
+                    Icons.phone_android,
+                    color: Colors.blue,
+                    size: 20,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    'Suivi de l\'appareil de l\'enfant',
+                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'Pour surveiller l\'utilisation des applications de votre enfant, assurez-vous que le suivi est activé sur son appareil.',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: Theme.of(context).colorScheme.outline,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.surface,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: Theme.of(context).dividerColor.withOpacity(0.3),
+                ),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Instructions pour l\'enfant :',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  _buildInstructionStep('1.', 'Ouvrez l\'application MindGuard sur l\'appareil de l\'enfant'),
+                  _buildInstructionStep('2.', 'Allez dans "Utilisation des applications"'),
+                  _buildInstructionStep('3.', 'Appuyez sur "Activer le suivi" et autorisez les permissions'),
+                  _buildInstructionStep('4.', 'Les données apparaîtront ici automatiquement'),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Icon(
+                  Icons.info_outline,
+                  size: 16,
+                  color: Theme.of(context).colorScheme.outline,
+                ),
+                const SizedBox(width: 4),
+                Expanded(
+                  child: Text(
+                    'Le suivi nécessite l\'autorisation des statistiques d\'utilisation sur l\'appareil Android.',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: Theme.of(context).colorScheme.outline,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildInstructionStep(String step, String instruction) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 4),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            step,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: Theme.of(context).colorScheme.primary,
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              instruction,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: Theme.of(context).colorScheme.onSurface,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

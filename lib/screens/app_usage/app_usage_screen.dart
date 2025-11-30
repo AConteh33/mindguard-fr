@@ -4,6 +4,8 @@ import 'package:provider/provider.dart';
 import 'package:fl_chart/fl_chart.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/screen_time_provider.dart';
+import '../../providers/app_usage_provider.dart';
+import '../../services/app_usage_platform_service.dart';
 import '../../widgets/visual/custom_line_chart.dart';
 
 class AppUsageScreen extends StatefulWidget {
@@ -14,15 +16,226 @@ class AppUsageScreen extends StatefulWidget {
 }
 
 class _AppUsageScreenState extends State<AppUsageScreen> {
+  Future<bool> _checkPermissions() async {
+    return await AppUsagePlatformService.hasUsageStatsPermission();
+  }
+
+  Future<void> _requestPermissions() async {
+    final granted = await AppUsagePlatformService.requestUsageStatsPermission();
+    if (granted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Permission accordée! Redémarrage du suivi...'),
+          duration: Duration(seconds: 2),
+        ),
+      );
+      // Reload data after permission is granted
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      if (authProvider.userModel != null) {
+        final appUsageProvider = Provider.of<AppUsageProvider>(context, listen: false);
+        appUsageProvider.loadAppUsageData(authProvider.userModel!.uid);
+      }
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Permission refusée. Veuillez l\'activer manuellement dans les paramètres.'),
+          duration: Duration(seconds: 3),
+        ),
+      );
+    }
+  }
+
+  Widget _buildDeviceTrackingCard(AppUsageProvider appUsageProvider) {
+    return FutureBuilder<bool>(
+      future: _checkPermissions(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return ShadCard(
+            child: Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Row(
+                children: [
+                  const CircularProgressIndicator(),
+                  const SizedBox(width: 12),
+                  Text(
+                    'Vérification des permissions...',
+                    style: Theme.of(context).textTheme.bodyMedium,
+                  ),
+                ],
+              ),
+            ),
+          );
+        }
+
+        final hasPermission = snapshot.data ?? false;
+        
+        if (hasPermission) {
+          return ShadCard(
+            child: Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.green.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Icon(
+                      Icons.check_circle,
+                      color: Colors.green,
+                      size: 20,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Suivi des applications activé',
+                          style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                            color: Colors.green,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          'Les données d\'utilisation sont collectées en temps réel',
+                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: Theme.of(context).colorScheme.outline,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }
+
+        return ShadCard(
+          child: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: Colors.orange.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Icon(
+                        Icons.warning_outlined,
+                        color: Colors.orange,
+                        size: 20,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        'Activer le suivi des applications',
+                        style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  'Pour voir les données d\'utilisation, vous devez autoriser l\'accès aux statistiques d\'utilisation de l\'appareil.',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: Theme.of(context).colorScheme.outline,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.surface,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: Theme.of(context).dividerColor.withOpacity(0.3),
+                    ),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Instructions rapides :',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      _buildInstructionStep('1.', 'Appuyez sur le bouton "Activer" ci-dessous'),
+                      _buildInstructionStep('2.', 'Autorisez l\'accès aux statistiques d\'utilisation'),
+                      _buildInstructionStep('3.', 'Retournez ici pour voir les données'),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 12),
+                SizedBox(
+                  width: double.infinity,
+                  child: ShadButton(
+                    onPressed: _requestPermissions,
+                    child: const Text('Activer le suivi'),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildInstructionStep(String step, String instruction) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 4),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            step,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: Theme.of(context).colorScheme.primary,
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              instruction,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: Theme.of(context).colorScheme.onSurface,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final authProvider = Provider.of<AuthProvider>(context);
     final screenTimeProvider = Provider.of<ScreenTimeProvider>(context);
+    final appUsageProvider = Provider.of<AppUsageProvider>(context);
     
     // Load screen time data when user changes
     if (authProvider.isLoggedIn && authProvider.userModel != null) {
       if (screenTimeProvider.screenTimeData == null) {
         screenTimeProvider.loadScreenTimeData(authProvider.userModel!.uid);
+      }
+      if (appUsageProvider.appUsageData.isEmpty) {
+        appUsageProvider.loadAppUsageData(authProvider.userModel!.uid);
       }
     }
     
@@ -34,6 +247,9 @@ class _AppUsageScreenState extends State<AppUsageScreen> {
         padding: const EdgeInsets.all(16.0),
         child: Column(
           children: [
+            // Device tracking permission card
+            _buildDeviceTrackingCard(appUsageProvider),
+            const SizedBox(height: 16),
             // Weekly chart
             ShadCard(
               child: Padding(
@@ -74,7 +290,7 @@ class _AppUsageScreenState extends State<AppUsageScreen> {
                       style: Theme.of(context).textTheme.titleMedium,
                     ),
                     const SizedBox(height: 16),
-                    _buildDetailedAppUsageList(),
+                    _buildDetailedAppUsageList(appUsageProvider),
                   ],
                 ),
               ),
@@ -85,22 +301,95 @@ class _AppUsageScreenState extends State<AppUsageScreen> {
     );
   }
   
-  Widget _buildDetailedAppUsageList() {
-    // Sample app usage data
-    final apps = [
-      {'name': 'YouTube', 'time': '1h 23m', 'color': Colors.red, 'dailyAvg': '14m'},
-      {'name': 'Instagram', 'time': '52m', 'color': Colors.pink, 'dailyAvg': '9m'},
-      {'name': 'WhatsApp', 'time': '38m', 'color': Colors.green, 'dailyAvg': '6m'},
-      {'name': 'TikTok', 'time': '27m', 'color': Colors.black, 'dailyAvg': '4m'},
-      {'name': 'Twitter', 'time': '15m', 'color': Colors.blue, 'dailyAvg': '3m'},
-      {'name': 'Discord', 'time': '12m', 'color': Colors.purple, 'dailyAvg': '2m'},
-      {'name': 'Netflix', 'time': '8m', 'color': Colors.red, 'dailyAvg': '1m'},
+  Widget _buildDetailedAppUsageList(AppUsageProvider appUsageProvider) {
+    if (appUsageProvider.isLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    
+    if (appUsageProvider.lastError != null) {
+      return ShadCard(
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            children: [
+              Text(
+                'Erreur de chargement des données',
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(color: Colors.red),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                appUsageProvider.lastError!,
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+              const SizedBox(height: 12),
+              ElevatedButton(
+                onPressed: () {
+                  final authProvider = Provider.of<AuthProvider>(context, listen: false);
+                  if (authProvider.userModel != null) {
+                    appUsageProvider.loadAppUsageData(authProvider.userModel!.uid);
+                  }
+                },
+                child: const Text('Réessayer'),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+    
+    // Get real app usage data from provider
+    final topApps = appUsageProvider.getTopAppsByUsage(limit: 7);
+    
+    if (topApps.isEmpty) {
+      return Column(
+        children: [
+          Icon(
+            Icons.phone_android_outlined,
+            size: 48,
+            color: Theme.of(context).colorScheme.outline,
+          ),
+          const SizedBox(height: 12),
+          Text(
+            'Aucune donnée d\'utilisation disponible',
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              color: Theme.of(context).colorScheme.outline,
+            ),
+          ),
+          const SizedBox(height: 8),
+          if (!appUsageProvider.hasNativeTracking)
+            Text(
+              'Activez le suivi des applications sur l\'appareil de votre enfant',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: Theme.of(context).colorScheme.outline,
+              ),
+              textAlign: TextAlign.center,
+            ),
+        ],
+      );
+    }
+    
+    // Color palette for apps
+    final colors = [
+      Colors.red, Colors.pink, Colors.green, Colors.black, 
+      Colors.blue, Colors.purple, Colors.orange,
     ];
     
     return Column(
-      children: apps.asMap().entries.map((entry) {
+      children: topApps.asMap().entries.map((entry) {
         int index = entry.key;
         Map<String, dynamic> app = entry.value;
+        final totalSeconds = app['totalUsageSeconds'] as int;
+        final hours = totalSeconds ~/ 3600;
+        final minutes = (totalSeconds % 3600) ~/ 60;
+        final dailyAvg = (totalSeconds / 7 / 60).round(); // Average per day
+        
+        String timeText = '';
+        if (hours > 0) {
+          timeText = '${hours}h ${minutes}m';
+        } else {
+          timeText = '${minutes}m';
+        }
+        
         return Container(
           margin: const EdgeInsets.only(bottom: 12),
           child: Row(
@@ -109,7 +398,7 @@ class _AppUsageScreenState extends State<AppUsageScreen> {
                 width: 12,
                 height: 12,
                 decoration: BoxDecoration(
-                  color: app['color'],
+                  color: colors[index % colors.length],
                   shape: BoxShape.circle,
                 ),
               ),
@@ -117,7 +406,7 @@ class _AppUsageScreenState extends State<AppUsageScreen> {
               Expanded(
                 flex: 2,
                 child: Text(
-                  app['name'],
+                  app['appName'] as String? ?? 'App inconnue',
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                     fontWeight: FontWeight.w600,
                   ),
@@ -125,7 +414,7 @@ class _AppUsageScreenState extends State<AppUsageScreen> {
               ),
               Expanded(
                 child: Text(
-                  app['time'],
+                  timeText,
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                     fontWeight: FontWeight.w600,
                   ),
@@ -133,7 +422,7 @@ class _AppUsageScreenState extends State<AppUsageScreen> {
               ),
               Expanded(
                 child: Text(
-                  'Moy: ${app['dailyAvg']}',
+                  'Moy: ${dailyAvg}m',
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
                     color: Theme.of(context).colorScheme.outline,
                   ),

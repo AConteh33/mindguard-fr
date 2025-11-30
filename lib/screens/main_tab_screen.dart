@@ -174,12 +174,15 @@ class _MainTabScreenState extends State<MainTabScreen> {
   }
 
   void _onTabTapped(int index) {
+    print('_onTabTapped called with index: $index, screens length: ${_screens.length}');
+    
     // Ensure index is within bounds
     if (index < 0 || index >= _screens.length) {
       print('Invalid tab index: $index, screens length: ${_screens.length}');
       return;
     }
     
+    print('Tab tapped successfully - changing to index $index');
     setState(() {
       _currentIndex = index;
     });
@@ -194,6 +197,16 @@ class _MainTabScreenState extends State<MainTabScreen> {
   Widget build(BuildContext context) {
     final authProvider = Provider.of<AuthProvider>(context);
     final userRole = authProvider.userModel?.role ?? 'child';
+    final deviceType = ResponsiveHelper.getDeviceType(context);
+    final screenWidth = MediaQuery.of(context).size.width;
+    
+    print('MainTabScreen build: role=$userRole, deviceType=$deviceType, screenWidth=$screenWidth, screens=${_screens.length}');
+    
+    // For debugging: force mobile layout if screen width is small
+    if (screenWidth < 800) {
+      print('Forcing mobile layout due to screen width: $screenWidth');
+      return _buildMobileLayout(context, userRole);
+    }
     
     return ResponsiveLayout(
       mobile: _buildMobileLayout(context, userRole),
@@ -203,6 +216,8 @@ class _MainTabScreenState extends State<MainTabScreen> {
   }
 
   Widget _buildMobileLayout(BuildContext context, String userRole) {
+    print('Building mobile layout for user role: $userRole, screens count: ${_screens.length}');
+    
     return Scaffold(
       body: Column(
         children: [
@@ -265,6 +280,7 @@ class _MainTabScreenState extends State<MainTabScreen> {
                 ? PageView(
                     controller: _pageController,
                     onPageChanged: (index) {
+                      print('PageView changed to index: $index');
                       // Ensure index is within bounds
                       if (index >= 0 && index < _screens.length) {
                         setState(() {
@@ -275,7 +291,14 @@ class _MainTabScreenState extends State<MainTabScreen> {
                     children: _screens,
                   )
                 : const Center(
-                    child: CircularProgressIndicator(),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        CircularProgressIndicator(),
+                        SizedBox(height: 16),
+                        Text('Chargement des écrans...'),
+                      ],
+                    ),
                   ),
           ),
         ],
@@ -426,6 +449,9 @@ class _MainTabScreenState extends State<MainTabScreen> {
   }
 
   Widget _buildBottomNavigationBar(String userRole) {
+    final items = _getBottomNavItems(userRole);
+    print('Building bottom navigation for user role: $userRole, items count: ${items.length}, current index: $_currentIndex');
+    
     return Container(
       decoration: BoxDecoration(
         color: Theme.of(context).scaffoldBackgroundColor,
@@ -444,11 +470,18 @@ class _MainTabScreenState extends State<MainTabScreen> {
       ),
       child: BottomNavigationBar(
         currentIndex: _currentIndex,
-        onTap: _onTabTapped,
+        onTap: (index) {
+          print('Bottom navigation tapped: index $index');
+          _onTabTapped(index);
+        },
         type: BottomNavigationBarType.fixed,
         backgroundColor: Colors.transparent,
         elevation: 0,
-        items: _getBottomNavItems(userRole),
+        items: items,
+        selectedFontSize: 12,
+        unselectedFontSize: 12,
+        selectedItemColor: Theme.of(context).colorScheme.primary,
+        unselectedItemColor: Theme.of(context).colorScheme.outline,
       ),
     );
   }
