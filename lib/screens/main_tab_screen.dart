@@ -48,6 +48,12 @@ class _MainTabScreenState extends State<MainTabScreen> {
     _currentIndex = widget.initialIndex;
     _buildScreens();
     
+    // Ensure initial index is within bounds
+    if (_currentIndex >= _screens.length) {
+      _currentIndex = 0;
+      _pageController.animateToPage(0, duration: Duration.zero, curve: Curves.linear);
+    }
+    
     // Initialize screen time monitoring for child users
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _initializeScreenTimeMonitoring();
@@ -57,6 +63,8 @@ class _MainTabScreenState extends State<MainTabScreen> {
   void _buildScreens() {
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
     final userRole = authProvider.userModel?.role ?? 'child';
+    
+    print('Building screens for user role: $userRole');
     
     switch (userRole) {
       case 'parent':
@@ -88,6 +96,8 @@ class _MainTabScreenState extends State<MainTabScreen> {
         ];
         break;
     }
+    
+    print('Screens list built with ${_screens.length} screens');
   }
 
   @override
@@ -164,6 +174,12 @@ class _MainTabScreenState extends State<MainTabScreen> {
   }
 
   void _onTabTapped(int index) {
+    // Ensure index is within bounds
+    if (index < 0 || index >= _screens.length) {
+      print('Invalid tab index: $index, screens length: ${_screens.length}');
+      return;
+    }
+    
     setState(() {
       _currentIndex = index;
     });
@@ -245,15 +261,22 @@ class _MainTabScreenState extends State<MainTabScreen> {
           
           // Main content
           Expanded(
-            child: PageView(
-              controller: _pageController,
-              onPageChanged: (index) {
-                setState(() {
-                  _currentIndex = index;
-                });
-              },
-              children: _screens,
-            ),
+            child: _screens.isNotEmpty
+                ? PageView(
+                    controller: _pageController,
+                    onPageChanged: (index) {
+                      // Ensure index is within bounds
+                      if (index >= 0 && index < _screens.length) {
+                        setState(() {
+                          _currentIndex = index;
+                        });
+                      }
+                    },
+                    children: _screens,
+                  )
+                : const Center(
+                    child: CircularProgressIndicator(),
+                  ),
           ),
         ],
       ),
@@ -301,15 +324,22 @@ class _MainTabScreenState extends State<MainTabScreen> {
           
           // Main content
           Expanded(
-            child: PageView(
-              controller: _pageController,
-              onPageChanged: (index) {
-                setState(() {
-                  _currentIndex = index;
-                });
-              },
-              children: _screens,
-            ),
+            child: _screens.isNotEmpty
+                ? PageView(
+                    controller: _pageController,
+                    onPageChanged: (index) {
+                      // Ensure index is within bounds
+                      if (index >= 0 && index < _screens.length) {
+                        setState(() {
+                          _currentIndex = index;
+                        });
+                      }
+                    },
+                    children: _screens,
+                  )
+                : const Center(
+                    child: CircularProgressIndicator(),
+                  ),
           ),
         ],
       ),
@@ -372,15 +402,22 @@ class _MainTabScreenState extends State<MainTabScreen> {
           // Main content with proper max width
           Expanded(
             child: ResponsiveContainer(
-              child: PageView(
-                controller: _pageController,
-                onPageChanged: (index) {
-                  setState(() {
-                    _currentIndex = index;
-                  });
-                },
-                children: _screens,
-              ),
+              child: _screens.isNotEmpty
+                  ? PageView(
+                      controller: _pageController,
+                      onPageChanged: (index) {
+                        // Ensure index is within bounds
+                        if (index >= 0 && index < _screens.length) {
+                          setState(() {
+                            _currentIndex = index;
+                          });
+                        }
+                      },
+                      children: _screens,
+                    )
+                  : const Center(
+                      child: CircularProgressIndicator(),
+                    ),
             ),
           ),
         ],

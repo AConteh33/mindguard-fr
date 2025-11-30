@@ -8,12 +8,50 @@ class ScreenTimeProvider with ChangeNotifier {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   StreamSubscription<DocumentSnapshot>? _screenTimeSubscription;
   StreamSubscription<QuerySnapshot>? _usageSubscription;
+  
+  // Debouncing variables
+  Timer? _debounceTimer;
+  Map<String, dynamic>? _lastNotifiedData;
+  static const Duration _debounceDelay = Duration(milliseconds: 500);
+  
+  // Rate limiting variables
+  DateTime? _lastUpdate;
+  static const Duration _rateLimitDelay = Duration(seconds: 2);
 
   Map<String, dynamic>? get screenTimeData => _screenTimeData;
   bool get isLoading => _isLoading;
 
+  // Safely notify listeners with debouncing and change detection
+  void _safeNotifyListeners() {
+    // Rate limiting - check if enough time has passed since last update
+    final now = DateTime.now();
+    if (_lastUpdate != null && 
+        now.difference(_lastUpdate!) < _rateLimitDelay) {
+      return; // Skip update due to rate limiting
+    }
+    
+    // Cancel existing debounce timer
+    _debounceTimer?.cancel();
+    
+    // Check if data actually changed
+    if (_lastNotifiedData != null && _screenTimeData != null) {
+      // Simple comparison - you can make this more sophisticated if needed
+      if (_lastNotifiedData.toString() == _screenTimeData.toString()) {
+        return; // No change, don't notify
+      }
+    }
+    
+    // Debounce the notification
+    _debounceTimer = Timer(_debounceDelay, () {
+      _lastUpdate = DateTime.now();
+      _lastNotifiedData = Map<String, dynamic>.from(_screenTimeData ?? {});
+      notifyListeners();
+    });
+  }
+
   Future<void> loadScreenTimeData(String userId) async {
     _isLoading = true;
+    _lastUpdate = null; // Reset rate limiting for manual loads
     notifyListeners();
 
     try {
@@ -105,7 +143,7 @@ class ScreenTimeProvider with ChangeNotifier {
           'timeBlocks': usageData['timeBlocks'] ?? [],
         };
         
-        notifyListeners();
+        _safeNotifyListeners();
         
         if (kDebugMode) print('Screen time usage data updated in real-time');
       }
@@ -163,7 +201,7 @@ class ScreenTimeProvider with ChangeNotifier {
       }
       
       _screenTimeData = aggregatedData;
-      notifyListeners();
+      _safeNotifyListeners();
       
       if (kDebugMode) print('Children screen time data updated in real-time');
     }, onError: (error) {
@@ -171,6 +209,7 @@ class ScreenTimeProvider with ChangeNotifier {
     });
   }
   Future<void> stopRealtimeListening() async {
+    _debounceTimer?.cancel();
     await _screenTimeSubscription?.cancel();
     await _usageSubscription?.cancel();
     _screenTimeSubscription = null;
@@ -179,6 +218,7 @@ class ScreenTimeProvider with ChangeNotifier {
 
   @override
   void dispose() {
+    _debounceTimer?.cancel();
     _screenTimeSubscription?.cancel();
     _usageSubscription?.cancel();
     super.dispose();
