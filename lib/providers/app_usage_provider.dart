@@ -67,7 +67,15 @@ class AppUsageProvider with ChangeNotifier {
       // Filter by date range and sort in UI
       final filteredDocs = snapshot.docs.where((doc) {
         final data = doc.data() as Map<String, dynamic>;
-        final timestamp = data['timestamp'] as int?;
+        final timestampValue = data['timestamp'];
+        int? timestamp;
+        
+        if (timestampValue is Timestamp) {
+          timestamp = timestampValue.millisecondsSinceEpoch;
+        } else if (timestampValue is int) {
+          timestamp = timestampValue;
+        }
+        
         if (timestamp == null) return false;
         return timestamp >= startDate.millisecondsSinceEpoch;
       }).toList();
@@ -79,8 +87,23 @@ class AppUsageProvider with ChangeNotifier {
           })
           .toList()
         ..sort((a, b) {
-          final aTime = a['timestamp'] as int?;
-          final bTime = b['timestamp'] as int?;
+          final aTimeValue = a['timestamp'];
+          final bTimeValue = b['timestamp'];
+          
+          int? aTime, bTime;
+          
+          if (aTimeValue is Timestamp) {
+            aTime = aTimeValue.millisecondsSinceEpoch;
+          } else if (aTimeValue is int) {
+            aTime = aTimeValue;
+          }
+          
+          if (bTimeValue is Timestamp) {
+            bTime = bTimeValue.millisecondsSinceEpoch;
+          } else if (bTimeValue is int) {
+            bTime = bTimeValue;
+          }
+          
           if (aTime == null && bTime == null) return 0;
           if (aTime == null) return 1;
           if (bTime == null) return -1;
