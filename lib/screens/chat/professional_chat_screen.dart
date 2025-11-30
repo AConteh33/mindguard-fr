@@ -257,10 +257,13 @@ class _ProfessionalChatScreenState extends State<ProfessionalChatScreen> {
               child: Row(
                 children: [
                   Expanded(
-                    child: ShadInput(
+                    child: TextFormField(
                       controller: _messageController,
-                      placeholder: const Text('Écrivez votre message...'),
-                      onSubmitted: (_) => _sendMessage(),
+                      decoration: const InputDecoration(
+                        hintText: 'Écrivez votre message...',
+                        border: InputBorder.none,
+                      ),
+                      onFieldSubmitted: (_) => _sendMessage(),
                     ),
                   ),
                   const SizedBox(width: 8),
