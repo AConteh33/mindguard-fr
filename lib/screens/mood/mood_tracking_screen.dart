@@ -149,7 +149,7 @@ class _MoodTrackingScreenState extends State<MoodTrackingScreen> {
     final moodProvider = Provider.of<MoodProvider>(context, listen: false);
     
     if (authProvider.userModel != null) {
-      // Save to mock data service
+      // Save mood entry
       moodProvider.addMoodEntry(
         authProvider.userModel!.uid, 
         _selectedMood, 

@@ -259,7 +259,7 @@ class AuthProvider with ChangeNotifier {
   // Quick login for development purposes - only used in debug builds
   Future<void> quickLogin(String role, {String? name, String? email}) async {
     if (kDebugMode) {
-      // Create a mock user for development purposes
+      // Create a development user for testing purposes
       _userModel = UserModel(
         uid: 'dev_${role.toLowerCase()}_user',
         name: name ?? '${role.substring(0, 1).toUpperCase() + role.substring(1).toLowerCase()} User',

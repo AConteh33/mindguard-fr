@@ -289,7 +289,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                             labelText: 'Entrez votre adresse e-mail',
                             border: OutlineInputBorder(),
                           ),
-                          enabled: false, // Email shouldn't be editable in this mock
+                          enabled: false, // Email shouldn't be editable here
                         ),
                       ],
                     ),

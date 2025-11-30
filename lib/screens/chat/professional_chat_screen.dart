@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:shadcn_ui/shadcn_ui.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../providers/auth_provider.dart';
+import '../../models/user_model.dart';
 import '../../widgets/visual/animated_background_visual.dart';
 
 class ProfessionalChatScreen extends StatefulWidget {
@@ -26,46 +27,7 @@ class _ProfessionalChatScreenState extends State<ProfessionalChatScreen> {
   
   List<Map<String, dynamic>> _messages = [];
   bool _isLoading = true;
-  
-  // Mock messages for demonstration
-  final List<Map<String, dynamic>> _mockMessages = [
-    {
-      'id': '1',
-      'senderId': 'psych1',
-      'senderName': 'Dr. Marie Laurent',
-      'senderRole': 'psychologist',
-      'content': 'Bonjour Marie, je suis contente de notre rencontre aujourd\'hui. Comment vous sentez-vous après notre séance?',
-      'timestamp': DateTime.now().subtract(const Duration(hours: 2)),
-      'type': 'text',
-    },
-    {
-      'id': '2',
-      'senderId': 'parent1',
-      'senderName': 'Marie Dupont',
-      'senderRole': 'parent',
-      'content': 'Bonjour Dr. Laurent, merci beaucoup pour la séance. Je me sens déjà plus sereine. Thomas a bien réagi aussi.',
-      'timestamp': DateTime.now().subtract(const Duration(minutes: 90)),
-      'type': 'text',
-    },
-    {
-      'id': '3',
-      'senderId': 'psych1',
-      'senderName': 'Dr. Marie Laurent',
-      'senderRole': 'psychologist',
-      'content': 'C\'est excellent! Pour notre prochaine séance, j\'aimerais que vous observiez son sommeil cette semaine et que vous notiez les moments où il se sent le plus anxieux.',
-      'timestamp': DateTime.now().subtract(const Duration(minutes: 60)),
-      'type:': 'text',
-    },
-    {
-      'id': '4',
-      'senderId': 'parent1',
-      'senderName': 'Marie Dupont',
-      'senderRole': 'parent',
-      'content': 'Parfait, je vais faire ça. Dois-je aussi noter ce qu\'il mange? J\'ai lu que l\'alimentation peut influencer l\'anxiété.',
-      'timestamp': DateTime.now().subtract(const Duration(minutes: 30)),
-      'type': 'text',
-    },
-  ];
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
   @override
   void initState() {
@@ -81,27 +43,56 @@ class _ProfessionalChatScreenState extends State<ProfessionalChatScreen> {
   }
 
   Future<void> _loadMessages() async {
-    // Simulate loading messages
-    await Future.delayed(const Duration(seconds: 1));
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final currentUserId = authProvider.userModel?.uid;
     
-    setState(() {
-      _messages = _mockMessages;
-      _isLoading = false;
-    });
-    
-    // Scroll to bottom
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (_scrollController.hasClients) {
-        _scrollController.animateTo(
-          _scrollController.position.maxScrollExtent,
-          duration: const Duration(milliseconds: 300),
-          curve: Curves.easeOut,
-        );
-      }
-    });
+    if (currentUserId == null) {
+      setState(() {
+        _isLoading = false;
+      });
+      return;
+    }
+
+    try {
+      // Load messages from Firestore chat collection
+      QuerySnapshot snapshot = await _firestore
+          .collection('chats')
+          .doc(widget.consultationId ?? '${currentUserId}_${widget.psychologistId}')
+          .collection('messages')
+          .orderBy('timestamp', descending: true)
+          .limit(50)
+          .get();
+
+      List<Map<String, dynamic>> messages = snapshot.docs.map((doc) {
+        Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
+        data['id'] = doc.id;
+        return data;
+      }).toList();
+
+      setState(() {
+        _messages = messages;
+        _isLoading = false;
+      });
+      
+      // Scroll to bottom
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (_scrollController.hasClients) {
+          _scrollController.animateTo(
+            _scrollController.position.maxScrollExtent,
+            duration: const Duration(milliseconds: 300),
+            curve: Curves.easeOut,
+          );
+        }
+      });
+    } catch (e) {
+      print('Error loading messages: $e');
+      setState(() {
+        _isLoading = false;
+      });
+    }
   }
 
-  void _sendMessage() {
+  void _sendMessage() async {
     final message = _messageController.text.trim();
     if (message.isEmpty) return;
 
@@ -109,7 +100,6 @@ class _ProfessionalChatScreenState extends State<ProfessionalChatScreen> {
     if (authProvider.userModel == null) return;
 
     final newMessage = {
-      'id': DateTime.now().millisecondsSinceEpoch.toString(),
       'senderId': authProvider.userModel!.uid,
       'senderName': authProvider.userModel!.name ?? 'Parent',
       'senderRole': authProvider.userModel!.role,
@@ -118,63 +108,24 @@ class _ProfessionalChatScreenState extends State<ProfessionalChatScreen> {
       'type': 'text',
     };
 
-    setState(() {
-      _messages.add(newMessage);
-    });
+    try {
+      // Save message to Firestore
+      await _firestore
+          .collection('chats')
+          .doc(widget.consultationId ?? '${authProvider.userModel!.uid}_${widget.psychologistId}')
+          .collection('messages')
+          .add(newMessage);
 
-    _messageController.clear();
-    
-    // Scroll to bottom
-    if (_scrollController.hasClients) {
-      _scrollController.animateTo(
-        _scrollController.position.maxScrollExtent,
-        duration: const Duration(milliseconds: 300),
-        curve: Curves.easeOut,
+      _messageController.clear();
+      
+      // Reload messages to get the new one
+      _loadMessages();
+    } catch (e) {
+      print('Error sending message: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Erreur lors de l\'envoi du message')),
       );
     }
-
-    // Simulate psychologist response
-    _simulatePsychologistResponse();
-  }
-
-  void _simulatePsychologistResponse() {
-    Future.delayed(const Duration(seconds: 2), () {
-      if (mounted) {
-        final response = {
-          'id': DateTime.now().millisecondsSinceEpoch.toString(),
-          'senderId': widget.psychologistId,
-          'senderName': widget.psychologistName,
-          'senderRole': 'psychologist',
-          'content': _getRandomResponse(),
-          'timestamp': DateTime.now(),
-          'type': 'text',
-        };
-
-        setState(() {
-          _messages.add(response);
-        });
-
-        // Scroll to bottom
-        if (_scrollController.hasClients) {
-          _scrollController.animateTo(
-            _scrollController.position.maxScrollExtent,
-            duration: const Duration(milliseconds: 300),
-            curve: Curves.easeOut,
-          );
-        }
-      }
-    });
-  }
-
-  String _getRandomResponse() {
-    final responses = [
-      'C\'est une excellente observation, merci de partager cela avec moi.',
-      'Je comprends votre préoccupation. Explorons cela ensemble lors de notre prochaine séance.',
-      'Votre implication est vraiment remarquable. Continuez comme ça!',
-      'C\'est une question très pertinente. Nous en discuterons en détail.',
-      'Merci pour cette mise à jour. Cela me aide à mieux comprendre la situation.',
-    ];
-    return responses[DateTime.now().millisecond % responses.length];
   }
 
   @override
